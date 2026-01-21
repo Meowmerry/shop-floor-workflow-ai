@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Industrial Dashboard Theme */
+:root {
+  /* Status Colors */
+  --color-success: #22c55e;
+  --color-success-bg: #14532d;
+  --color-hold: #ef4444;
+  --color-hold-bg: #7f1d1d;
+  --color-progress: #3b82f6;
+  --color-progress-bg: #1e3a5f;
+  --color-pending: #6b7280;
+  --color-pending-bg: #374151;
+
+  /* Industrial dark theme */
+  --color-bg-primary: #111827;
+  --color-bg-secondary: #1f2937;
+  --color-bg-tertiary: #374151;
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-border: #4b5563;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Custom scrollbar for industrial look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Focus ring for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--color-progress);
+  outline-offset: 2px;
+}
+
+/* Touch target minimum size utility */
+.touch-target {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* QC Hold pulse (subtle but unmistakable) */
+@keyframes qcHoldPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.qc-hold-pulse {
+  animation: qcHoldPulse 1.5s ease-out infinite;
+}
