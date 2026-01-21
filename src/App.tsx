@@ -16,6 +16,7 @@ function App() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<NavTab>('Operator');
   const [scannedItem, setScannedItem] = useState<any>(null);
+  const [currentStep, setCurrentStep] = useState<string | undefined>(undefined);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -69,7 +70,7 @@ function App() {
   const renderView = () => {
     switch (activeTab) {
       case 'Operator':
-        return <OperatorView scannedItem={scannedItem} onClearScan={() => setScannedItem(null)} />;
+        return <OperatorView scannedItem={scannedItem} onClearScan={() => setScannedItem(null)} onStepChange={setCurrentStep} />;
       case 'QC':
         return <QCView scannedItem={scannedItem} onClearScan={() => setScannedItem(null)} />;
       case 'Shipping':
@@ -77,7 +78,7 @@ function App() {
       case 'Supervisor':
         return <SupervisorView scannedItem={scannedItem} onClearScan={() => setScannedItem(null)} />;
       default:
-        return <OperatorView scannedItem={scannedItem} onClearScan={() => setScannedItem(null)} />;
+        return <OperatorView scannedItem={scannedItem} onClearScan={() => setScannedItem(null)} onStepChange={setCurrentStep} />;
     }
   };
 
@@ -87,6 +88,7 @@ function App() {
       onTabChange={setActiveTab}
       currentUser={currentUser}
       onItemScanned={setScannedItem}
+      currentStep={currentStep}
     >
       {renderView()}
     </MainLayout>

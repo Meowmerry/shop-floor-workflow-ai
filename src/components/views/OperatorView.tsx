@@ -11,9 +11,10 @@ import  {useAuth} from '../../contexts';
 interface OperatorViewProps {
   readonly scannedItem?: WorkItem | null;
   readonly onClearScan?: () => void;
+  readonly onStepChange?: (step: string) => void;
 }
 
-export function OperatorView({ scannedItem, onClearScan }: OperatorViewProps) {
+export function OperatorView({ scannedItem, onClearScan, onStepChange }: OperatorViewProps) {
   const { currentUser } = useAuth();
   const {
     getAllItems,
@@ -38,6 +39,11 @@ export function OperatorView({ scannedItem, onClearScan }: OperatorViewProps) {
 
   // Check if current user is Supervisor
   const isSupervisor = currentUser?.role === 'Supervisor';
+
+  // Notify parent when activeStep changes
+  useEffect(() => {
+    onStepChange?.(activeStep);
+  }, [activeStep, onStepChange]);
 
   // Handle scanned item from parent
   useEffect(() => {

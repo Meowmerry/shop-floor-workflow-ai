@@ -12,9 +12,10 @@ interface HeaderProps {
   readonly onItemScanned?: (item: WorkItem) => void;
   readonly onTabChange?: (tab: NavTab) => void;
   readonly currentUser?: FactoryUser;
+  readonly currentStep?: string;
 }
 
-export function Header({ activeTab, onItemScanned, onTabChange, currentUser: _headerUser }: HeaderProps) {
+export function Header({ activeTab, onItemScanned, onTabChange, currentUser: _headerUser, currentStep }: HeaderProps) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const { getItemById, getAllItems } = useWorkflow();
@@ -43,6 +44,14 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: _he
       inputRef.current.focus();
     }
   }, [showScanner]);
+
+  // Clear scan result when tab or step changes
+  useEffect(() => {
+    setLastScanResult(null);
+    setShowScanPopup(false);
+    setShowScanner(false);
+    setScanInput('');
+  }, [activeTab, currentStep]);
 
   // When scanner is open, refocus after ANY click (buttons included).
   useEffect(() => {

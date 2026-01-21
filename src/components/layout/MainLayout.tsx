@@ -10,6 +10,7 @@ interface MainLayoutProps {
   readonly onTabChange: (tab: NavTab) => void;
   readonly onItemScanned?: (item: WorkItem) => void;
   readonly currentUser?: FactoryUser;
+  readonly currentStep?: string;
 }
 
 export function MainLayout({
@@ -18,6 +19,7 @@ export function MainLayout({
   onTabChange,
   onItemScanned,
   currentUser,
+  currentStep,
 }: MainLayoutProps) {
   return (
     <div className="flex min-h-screen bg-gray-950">
@@ -31,7 +33,8 @@ export function MainLayout({
           activeTab={activeTab} 
           onItemScanned={onItemScanned} 
           onTabChange={onTabChange}
-          currentUser={currentUser} 
+          currentUser={currentUser}
+          currentStep={currentStep}
         />
 
         {/* Page Content */}
