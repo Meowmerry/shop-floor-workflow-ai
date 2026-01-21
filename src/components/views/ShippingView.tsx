@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Truck, CheckCircle, Printer, MapPin, AlertTriangle, History, AlertOctagon } from 'lucide-react';
+import { Package, Truck, CheckCircle, Printer, MapPin, AlertTriangle, History, AlertOctagon, Eye } from 'lucide-react';
 import type { WorkItem } from '../../types';
 import { WorkItemCard } from '../WorkItemCard';
 import { HistoryTimeline } from '../HistoryTimeline';
@@ -28,6 +28,9 @@ export function ShippingView({ scannedItem, onClearScan }: ShippingViewProps) {
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showShipConfirm, setShowShipConfirm] = useState(false);
+
+  // Check if current user is Supervisor
+  const isSupervisor = currentUser?.role === 'Supervisor';
 
   // Handle scanned item from parent
   useEffect(() => {
@@ -241,58 +244,71 @@ export function ShippingView({ scannedItem, onClearScan }: ShippingViewProps) {
 
               {/* Actions */}
               <div className="space-y-2 pt-2">
-                {/* Start Packing */}
-                {currentItem.status === 'Pending' && !currentItem.onHold && (
-                  <button
-                    onClick={handleStartPacking}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-4
-                               bg-blue-600 hover:bg-blue-500 text-white font-medium
-                               rounded-lg transition-colors min-h-[56px]"
-                  >
-                    <Package className="w-5 h-5" />
-                    Start Packing
-                  </button>
-                )}
-
-                {/* Print Packing Slip */}
-                {!currentItem.onHold && currentItem.status !== 'Completed' && (
-                  <button
-                    onClick={handlePrintPackingSlip}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-4
-                               bg-gray-600 hover:bg-gray-500 text-white font-medium
-                               rounded-lg transition-colors min-h-[56px]"
-                  >
-                    <Printer className="w-5 h-5" />
-                    Print Packing Slip
-                  </button>
-                )}
-
-                {/* Ship Item */}
-                {currentItem.status === 'In Progress' && (
-                  <button
-                    onClick={handleShipItem}
-                    disabled={!shipStatus?.canShip}
-                    className={`w-full flex items-center justify-center gap-2 px-4 py-4
-                      font-medium rounded-lg transition-colors min-h-[56px]
-                      ${shipStatus?.canShip
-                        ? 'bg-green-600 hover:bg-green-500 text-white'
-                        : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
-                  >
-                    <Truck className="w-5 h-5" />
-                    {shipStatus?.canShip ? 'Mark as Shipped' : 'Cannot Ship'}
-                  </button>
-                )}
-
-                {/* Already Shipped */}
-                {currentItem.status === 'Completed' && (
-                  <div className="p-4 bg-green-900/30 border border-green-700 rounded-lg text-center">
-                    <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                    <p className="text-green-400 font-medium">Item Shipped</p>
+                {/* Read-Only Badge for Supervisor */}
+                {isSupervisor && (
+                  <div className="bg-gray-700 rounded-lg p-3 border border-gray-600 flex items-center gap-2 text-gray-300">
+                    <Eye className="w-4 h-4" />
+                    <span className="text-sm font-medium">Read-Only Mode</span>
                   </div>
                 )}
 
-                {/* History Toggle */}
+                {!isSupervisor && (
+                  <>
+                    {/* Start Packing */}
+                    {currentItem.status === 'Pending' && !currentItem.onHold && (
+                      <button
+                        onClick={handleStartPacking}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-4
+                                   bg-blue-600 hover:bg-blue-500 text-white font-medium
+                                   rounded-lg transition-colors min-h-[56px]"
+                      >
+                        <Package className="w-5 h-5" />
+                        Start Packing
+                      </button>
+                    )}
+
+                    {/* Print Packing Slip */}
+                    {!currentItem.onHold && currentItem.status !== 'Completed' && (
+                      <button
+                        onClick={handlePrintPackingSlip}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-4
+                                   bg-gray-600 hover:bg-gray-500 text-white font-medium
+                                   rounded-lg transition-colors min-h-[56px]"
+                      >
+                        <Printer className="w-5 h-5" />
+                        Print Packing Slip
+                      </button>
+                )}
+
+                    {/* Ship Item */}
+                    {currentItem.status === 'In Progress' && (
+                      <button
+                        onClick={handleShipItem}
+                        disabled={!shipStatus?.canShip}
+                        className={`w-full flex items-center justify-center gap-2 px-4 py-4
+                          font-medium rounded-lg transition-colors min-h-[56px]
+                          ${shipStatus?.canShip
+                            ? 'bg-green-600 hover:bg-green-500 text-white'
+                            : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
+                      >
+                        <Truck className="w-5 h-5" />
+                        {shipStatus?.canShip ? 'Mark as Shipped' : 'Cannot Ship'}
+                      </button>
+                    )}
+
+                    {/* Already Shipped */}
+                    {currentItem.status === 'Completed' && (
+                      <div className="p-4 bg-green-900/30 border border-green-700 rounded-lg text-center">
+                        <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                        <p className="text-green-400 font-medium">Item Shipped</p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* History Toggle - Always Available */}
                 <button
+                  title={isSupervisor ? "View audit history (Supervisor read-only)" : "View audit history"}
                   onClick={() => setShowHistory(!showHistory)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3
                              bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium

@@ -53,6 +53,7 @@ export function SupervisorView({ scannedItem, onClearScan }: SupervisorViewProps
   }, [scannedItem, getItemById]);
 
   const allItems = getAllItems();
+  console.log('All Items:', allItems);
 
   // Calculate statistics
   const stats = {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, AlertTriangle, ClipboardList, RotateCcw, History } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, ClipboardList, RotateCcw, History, Eye } from 'lucide-react';
 import type { WorkItem, HoldReason } from '../../types';
 import { HOLD_REASONS } from '../../types';
 import { WorkItemCard } from '../WorkItemCard';
@@ -36,6 +36,9 @@ export function QCView({ scannedItem, onClearScan }: QCViewProps) {
     'Thread Quality': false,
     'Documentation': false,
   });
+  
+  // Check if current user is Supervisor
+  const isSupervisor = currentUser?.role === 'Supervisor';
   
     const resetChecklist = () => {
     setChecklist({
@@ -168,6 +171,22 @@ export function QCView({ scannedItem, onClearScan }: QCViewProps) {
             )}
           </section>
 
+          {/* In Progress Inspection */}
+          {inProgressItems.length > 0 && (
+            <section>
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                <ClipboardList className="w-5 h-5 text-yellow-400" />
+                In Progress
+                <span className="ml-auto text-sm font-normal text-gray-400">{inProgressItems.length} items</span>
+              </h3>
+              <div className="space-y-3">
+                {inProgressItems.map((item) => (
+                  <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* On Hold */}
           {holdItems.length > 0 && (
             <section>
@@ -239,73 +258,86 @@ export function QCView({ scannedItem, onClearScan }: QCViewProps) {
 
               {/* Actions */}
               <div className="space-y-2 pt-2">
-                {/* Start Inspection */}
-                {currentItem.status === 'Pending' && !currentItem.onHold && (
-                  <button
-                    onClick={handleStartInspection}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-4
-                               bg-blue-600 hover:bg-blue-500 text-white font-medium
-                               rounded-lg transition-colors min-h-[56px]"
-                  >
-                    <ClipboardList className="w-5 h-5" />
-                    Start Inspection
-                  </button>
+                {/* Read-Only Badge for Supervisor */}
+                {isSupervisor && (
+                  <div className="bg-gray-700 rounded-lg p-3 border border-gray-600 flex items-center gap-2 text-gray-300">
+                    <Eye className="w-4 h-4" />
+                    <span className="text-sm font-medium">Read-Only Mode</span>
+                  </div>
                 )}
 
-                {/* Pass/Fail buttons for In Progress */}
-                {currentItem.status === 'In Progress' && !currentItem.onHold && (
+                {!isSupervisor && (
                   <>
+                    {/* Start Inspection */}
+                    {currentItem.status === 'Pending' && !currentItem.onHold && (
+                      <button
+                        onClick={handleStartInspection}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-4
+                                   bg-blue-600 hover:bg-blue-500 text-white font-medium
+                                   rounded-lg transition-colors min-h-[56px]"
+                      >
+                        <ClipboardList className="w-5 h-5" />
+                        Start Inspection
+                      </button>
+                    )}
+
+                    {/* Pass/Fail buttons for In Progress */}
+                    {currentItem.status === 'In Progress' && !currentItem.onHold && (
+                      <>
+                        <button
+                          onClick={handlePassQC}
+                          disabled={!allChecked}
+                          className={`w-full flex items-center justify-center gap-2 px-4 py-4
+                            font-medium rounded-lg transition-colors min-h-[56px]
+                            ${allChecked
+                              ? 'bg-green-600 hover:bg-green-500 text-white'
+                              : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
+                        >
+                          <CheckCircle className="w-5 h-5" />
+                          Pass Inspection
+                        </button>
+                        <button
+                          onClick={() => setShowFailModal(true)}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-4
+                                     bg-red-600 hover:bg-red-500 text-white font-medium
+                                     rounded-lg transition-colors min-h-[56px]"
+                        >
+                          <XCircle className="w-5 h-5" />
+                          Fail / Place on Hold
+                        </button>
+                      </>
+                    )}
+
+                    {/* Release Hold */}
+                    {currentItem.onHold && (
+                      <button
+                        onClick={handleReleaseHold}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-4
+                                   bg-yellow-600 hover:bg-yellow-500 text-white font-medium
+                                   rounded-lg transition-colors min-h-[56px]"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        Release Hold
+                      </button>
+                    )}
+
+                    {/* Rework */}
                     <button
-                      onClick={handlePassQC}
-                      disabled={!allChecked}
-                      className={`w-full flex items-center justify-center gap-2 px-4 py-4
-                        font-medium rounded-lg transition-colors min-h-[56px]
-                        ${allChecked
-                          ? 'bg-green-600 hover:bg-green-500 text-white'
-                          : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      Pass Inspection
-                    </button>
-                    <button
-                      onClick={() => setShowFailModal(true)}
+                      onClick={handleSendToRework}
                       className="w-full flex items-center justify-center gap-2 px-4 py-4
-                                 bg-red-600 hover:bg-red-500 text-white font-medium
+                                 bg-orange-600 hover:bg-orange-500 text-white font-medium
                                  rounded-lg transition-colors min-h-[56px]"
                     >
-                      <XCircle className="w-5 h-5" />
-                      Fail / Place on Hold
+                      <RotateCcw className="w-5 h-5" />
+                      Send to Rework
                     </button>
                   </>
                 )}
 
-                {/* Release Hold */}
-                {currentItem.onHold && (
-                  <button
-                    onClick={handleReleaseHold}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-4
-                               bg-yellow-600 hover:bg-yellow-500 text-white font-medium
-                               rounded-lg transition-colors min-h-[56px]"
-                  >
-                    <CheckCircle className="w-5 h-5" />
-                    Release Hold
-                  </button>
-                )}
-
-                {/* Rework */}
-                <button
-                  onClick={handleSendToRework}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-4
-                             bg-orange-600 hover:bg-orange-500 text-white font-medium
-                             rounded-lg transition-colors min-h-[56px]"
-                >
-                  <RotateCcw className="w-5 h-5" />
-                  Send to Rework
-                </button>
-
-                {/* History Toggle */}
+                {/* History Toggle - Always Available */}
                 <button
                   onClick={() => setShowHistory(!showHistory)}
+                  title={isSupervisor ? "View audit history (Supervisor read-only)" : "View audit history"}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3
                              bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium
                              rounded-lg transition-colors min-h-[48px]"

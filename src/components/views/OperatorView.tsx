@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Play, Pause, CheckCircle, AlertTriangle, RotateCcw, History } from 'lucide-react';
+import { Play, Pause, CheckCircle, AlertTriangle, RotateCcw, History, ChevronDown, ChevronUp, AlertCircle, ArrowRight, Eye } from 'lucide-react';
 import type { WorkItem, WorkflowStep, HoldReason } from '../../types';
 import { WORKFLOW_STEPS, HOLD_REASONS } from '../../types';
 import { WorkItemCard } from '../WorkItemCard';
@@ -32,19 +32,31 @@ export function OperatorView({ scannedItem, onClearScan }: OperatorViewProps) {
   const [holdReason, setHoldReason] = useState<HoldReason | ''>('');
   const [showHistory, setShowHistory] = useState(false);
   const [showReworkConfirm, setShowReworkConfirm] = useState(false);
+  const [expandedActive, setExpandedActive] = useState(true);
+  const [expandedHold, setExpandedHold] = useState(true);
+  const [departmentMismatch, setDepartmentMismatch] = useState(false);
+
+  // Check if current user is Supervisor
+  const isSupervisor = currentUser?.role === 'Supervisor';
 
   // Handle scanned item from parent
   useEffect(() => {
     if (scannedItem) {
       const freshItem = getItemById(scannedItem.id);
       if (freshItem) {
-        setSelectedItem(freshItem);
-        if (['Saw', 'Thread', 'CNC'].includes(freshItem.currentStep)) {
-          setActiveStep(freshItem.currentStep);
+        // Check if item's current step matches active tab
+        if (freshItem.currentStep !== activeStep) {
+          // Department mismatch - show warning
+          setSelectedItem(freshItem);
+          setDepartmentMismatch(true);
+        } else {
+          // Item is at correct department - select it normally
+          setSelectedItem(freshItem);
+          setDepartmentMismatch(false);
         }
       }
     }
-  }, [scannedItem, getItemById]);
+  }, [scannedItem, getItemById, activeStep]);
 
   // Get items for the active step
   const allItems = getAllItems();
@@ -130,7 +142,10 @@ export function OperatorView({ scannedItem, onClearScan }: OperatorViewProps) {
             return (
               <button
                 key={step}
-                onClick={() => setActiveStep(step)}
+                onClick={() => {
+                  setActiveStep(step);
+                  setSelectedItem(null);
+                }}
                 className={`
                   flex items-center gap-3 px-6 py-4 rounded-lg font-medium
                   transition-all duration-150 min-h-[56px] min-w-[140px]
@@ -159,38 +174,60 @@ export function OperatorView({ scannedItem, onClearScan }: OperatorViewProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Work Queue */}
         <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <button
+            onClick={() => setExpandedActive(!expandedActive)}
+            className="w-full text-lg font-semibold text-white flex items-center gap-2 hover:opacity-80 transition-opacity group"
+          >
+            {expandedActive ? (
+              <ChevronUp className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+            )}
             <Play className="w-5 h-5 text-blue-400" />
             Active Queue - {activeStep}
             <span className="ml-auto text-sm font-normal text-gray-400">{stepItems.length} items</span>
-          </h3>
+          </button>
 
-          {stepItems.length > 0 ? (
-            <div className="space-y-3">
-              {stepItems.map((item) => (
-                <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
-              ))}
-            </div>
-          ) : (
-            <div className="bg-gray-800 rounded-lg p-8 text-center">
-              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-              <p className="text-gray-400">No items in queue for {activeStep}</p>
-            </div>
+          {expandedActive && (
+            <>
+              {stepItems.length > 0 ? (
+                <div className="space-y-3">
+                  {stepItems.map((item) => (
+                    <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-gray-800 rounded-lg p-8 text-center">
+                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                  <p className="text-gray-400">No items in queue for {activeStep}</p>
+                </div>
+              )}
+            </>
           )}
 
           {/* Hold Items */}
           {holdItems.length > 0 && (
             <div className="mt-6">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setExpandedHold(!expandedHold)}
+                className="w-full text-lg font-semibold text-white flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity group"
+              >
+                {expandedHold ? (
+                  <ChevronUp className="w-5 h-5 text-red-400 group-hover:scale-110 transition-transform" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-red-400 group-hover:scale-110 transition-transform" />
+                )}
                 <AlertTriangle className="w-5 h-5 text-red-400" />
                 On Hold
                 <span className="ml-auto text-sm font-normal text-gray-400">{holdItems.length} items</span>
-              </h3>
-              <div className="space-y-3">
-                {holdItems.map((item) => (
-                  <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
-                ))}
-              </div>
+              </button>
+              {expandedHold && (
+                <div className="space-y-3">
+                  {holdItems.map((item) => (
+                    <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -200,7 +237,34 @@ export function OperatorView({ scannedItem, onClearScan }: OperatorViewProps) {
           <h3 className="text-lg font-semibold text-white mb-4">Item Details</h3>
 
           {currentItem ? (
-            <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+            <div className="bg-gray-800 rounded-lg p-5 border border-gray-700 space-y-4">
+              {/* Department Mismatch Warning */}
+              {departmentMismatch && (
+                <div className="p-4 bg-amber-900/30 border-2 border-amber-500 rounded-lg animate-pulse">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-amber-300 mb-2">Item at Wrong Station</p>
+                      <p className="text-amber-200 text-sm mb-3">
+                        Item <span className="font-mono text-amber-100">{currentItem.id}</span> is currently at <span className="font-bold">{currentItem.currentStep}</span>.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setActiveStep(currentItem.currentStep as WorkflowStep);
+                          setDepartmentMismatch(false);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3
+                                   bg-amber-600 hover:bg-amber-500 text-white font-medium
+                                   rounded-lg transition-colors min-h-[48px] animate-pulse"
+                      >
+                        <ArrowRight className="w-5 h-5" />
+                        Switch to {currentItem.currentStep} Station
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4">
                 {/* Item Header */}
                 <div>
@@ -243,67 +307,81 @@ export function OperatorView({ scannedItem, onClearScan }: OperatorViewProps) {
 
                 {/* Action Buttons */}
                 <div className="space-y-2 pt-2">
-                  {currentItem.status === 'Pending' && !currentItem.onHold && (
-                    <button
-                      onClick={handleStartStep}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-4
-                                 bg-blue-600 hover:bg-blue-500 text-white font-medium
-                                 rounded-lg transition-colors min-h-[56px]"
-                    >
-                      <Play className="w-5 h-5" />
-                      Start {currentItem.currentStep}
-                    </button>
+                  {/* Read-Only Badge for Supervisor */}
+                  {isSupervisor && (
+                    <div className="bg-gray-700 rounded-lg p-3 border border-gray-600 flex items-center gap-2 text-gray-300">
+                      <Eye className="w-4 h-4" />
+                      <span className="text-sm font-medium">Read-Only Mode</span>
+                    </div>
                   )}
 
-                  {currentItem.status === 'In Progress' && !currentItem.onHold && (
-                    <button
-                      onClick={handleCompleteStep}
-                      disabled={!canCompleteStep(currentItem)}
-                      className={`w-full flex items-center justify-center gap-2 px-4 py-4
-                        font-medium rounded-lg transition-colors min-h-[56px]
-                        ${canCompleteStep(currentItem)
-                          ? 'bg-green-600 hover:bg-green-500 text-white'
-                          : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      Complete {currentItem.currentStep}
-                    </button>
+                  {!departmentMismatch && !isSupervisor && (
+                    <>
+                      {currentItem.status === 'Pending' && !currentItem.onHold && (
+                        <button
+                          onClick={handleStartStep}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-4
+                                     bg-blue-600 hover:bg-blue-500 text-white font-medium
+                                     rounded-lg transition-colors min-h-[56px]"
+                        >
+                          <Play className="w-5 h-5" />
+                          Start {currentItem.currentStep}
+                        </button>
+                      )}
+
+                      {currentItem.status === 'In Progress' && !currentItem.onHold && (
+                        <button
+                          onClick={handleCompleteStep}
+                          disabled={!canCompleteStep(currentItem)}
+                          className={`w-full flex items-center justify-center gap-2 px-4 py-4
+                            font-medium rounded-lg transition-colors min-h-[56px]
+                            ${canCompleteStep(currentItem)
+                              ? 'bg-green-600 hover:bg-green-500 text-white'
+                              : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
+                        >
+                          <CheckCircle className="w-5 h-5" />
+                          Complete {currentItem.currentStep}
+                        </button>
+                      )}
+
+                      {currentItem.onHold ? (
+                        <button
+                          onClick={handleReleaseHold}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-4
+                                     bg-yellow-600 hover:bg-yellow-500 text-white font-medium
+                                     rounded-lg transition-colors min-h-[56px]"
+                        >
+                          <CheckCircle className="w-5 h-5" />
+                          Release Hold
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setShowHoldModal(true)}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-4
+                                     bg-yellow-600 hover:bg-yellow-500 text-white font-medium
+                                     rounded-lg transition-colors min-h-[56px]"
+                        >
+                          <Pause className="w-5 h-5" />
+                          Place on Hold
+                        </button>
+                      )}
+
+                      <button
+                        onClick={handleSendToRework}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-4
+                                   bg-orange-600 hover:bg-orange-500 text-white font-medium
+                                   rounded-lg transition-colors min-h-[56px]"
+                      >
+                        <RotateCcw className="w-5 h-5" />
+                        Send to Rework
+                      </button>
+                    </>
                   )}
 
-                  {currentItem.onHold ? (
-                    <button
-                      onClick={handleReleaseHold}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-4
-                                 bg-yellow-600 hover:bg-yellow-500 text-white font-medium
-                                 rounded-lg transition-colors min-h-[56px]"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      Release Hold
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setShowHoldModal(true)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-4
-                                 bg-yellow-600 hover:bg-yellow-500 text-white font-medium
-                                 rounded-lg transition-colors min-h-[56px]"
-                    >
-                      <Pause className="w-5 h-5" />
-                      Place on Hold
-                    </button>
-                  )}
-
-                  <button
-                    onClick={handleSendToRework}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-4
-                               bg-orange-600 hover:bg-orange-500 text-white font-medium
-                               rounded-lg transition-colors min-h-[56px]"
-                  >
-                    <RotateCcw className="w-5 h-5" />
-                    Send to Rework
-                  </button>
-
+                  {/* History Button - Always Available */}
                   <button
                     onClick={() => setShowHistory(!showHistory)}
+                    title={isSupervisor ? "View audit history (Supervisor read-only)" : "View audit history"}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3
                                bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium
                                rounded-lg transition-colors min-h-[48px]"

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, LogOut, User, Scan, X, Search, AlertCircle, Dice6, AlertTriangle, Factory } from 'lucide-react';
+import { Bell, LogOut, User, Scan, X, Search, AlertCircle, Dice6, AlertTriangle, Factory, ArrowRight, CheckCircle2 } from 'lucide-react';
 import type { NavTab, WorkItem } from '../../types';
 import type { FactoryUser } from '../../types/auth';
 
@@ -10,17 +10,18 @@ import { useAuth } from '../../contexts';
 interface HeaderProps {
   readonly activeTab: NavTab;
   readonly onItemScanned?: (item: WorkItem) => void;
+  readonly onTabChange?: (tab: NavTab) => void;
   readonly currentUser?: FactoryUser;
 }
 
-export function Header({ activeTab, onItemScanned, currentUser: _headerUser }: HeaderProps) {
+export function Header({ activeTab, onItemScanned, onTabChange, currentUser: _headerUser }: HeaderProps) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const { getItemById, getAllItems } = useWorkflow();
 
   const [scanInput, setScanInput] = useState('');
   const [showScanner, setShowScanner] = useState(false);
-  const [lastScanResult, setLastScanResult] = useState<{ found: boolean; item?: WorkItem; barcode: string } | null>(null);
+  const [lastScanResult, setLastScanResult] = useState<{ found: boolean; item?: WorkItem; barcode: string; stationMismatch?: boolean } | null>(null);
   const [showScanPopup, setShowScanPopup] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -89,7 +90,22 @@ export function Header({ activeTab, onItemScanned, currentUser: _headerUser }: H
     const item = getItemById(trimmedBarcode);
 
     if (item) {
-      setLastScanResult({ found: true, item, barcode: trimmedBarcode });
+      // Check if item's station matches active tab
+      // activeTab can be 'Operator', 'QC', 'Shipping', 'Supervisor'
+      // Map activeTab to operator steps: Operator = Saw/Thread/CNC, QC = QC, Shipping = Ship
+      const operatorSteps = ['Saw', 'Thread', 'CNC'];
+      const isStationMatch = 
+        (activeTab === 'Operator' && operatorSteps.includes(item.currentStep)) ||
+        (activeTab === 'QC' && item.currentStep === 'QC') ||
+        (activeTab === 'Shipping' && item.currentStep === 'Ship') ||
+        (activeTab === 'Supervisor'); // Supervisor can see all
+
+      setLastScanResult({ 
+        found: true, 
+        item, 
+        barcode: trimmedBarcode,
+        stationMismatch: !isStationMatch
+      });
       onItemScanned?.(item);
       setShowScanPopup(true);  // Show popup instead of auto-closing
       setScanInput('');  // Clear input for next scan
@@ -301,29 +317,52 @@ export function Header({ activeTab, onItemScanned, currentUser: _headerUser }: H
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 pointer-events-none">
           <div className="bg-gray-800 rounded-xl p-8 w-full max-w-md border-2 pointer-events-auto" 
             style={{ 
-              borderColor: lastScanResult.found ? '#10b981' : '#ef4444',
+              borderColor: lastScanResult.found ? (lastScanResult.stationMismatch ? '#f59e0b' : '#10b981') : '#ef4444',
               boxShadow: lastScanResult.found 
-                ? '0 0 30px rgba(16, 185, 129, 0.3)' 
+                ? (lastScanResult.stationMismatch 
+                  ? '0 0 30px rgba(245, 158, 11, 0.3)'
+                  : '0 0 30px rgba(16, 185, 129, 0.3)')
                 : '0 0 30px rgba(239, 68, 68, 0.3)'
             }}>
             
             {lastScanResult.found ? (
               <>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                    <h3 className="text-xl font-bold text-green-400">✓ FOUND</h3>
+                {/* Station Match vs Mismatch Header */}
+                {lastScanResult.stationMismatch ? (
+                  // MISMATCH HEADER
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse" />
+                      <h3 className="text-xl font-bold text-amber-400">⚠ STATION MISMATCH</h3>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowScanPopup(false);
+                        focusScannerInput();
+                      }}
+                      className="p-2 text-gray-400 hover:text-white transition-colors"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setShowScanPopup(false);
-                      focusScannerInput();
-                    }}
-                    className="p-2 text-gray-400 hover:text-white transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
+                ) : (
+                  // MATCH HEADER
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                      <h3 className="text-xl font-bold text-green-400">✓ FOUND</h3>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowScanPopup(false);
+                        focusScannerInput();
+                      }}
+                      className="p-2 text-gray-400 hover:text-white transition-colors"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                )}
 
                 <div className="bg-gray-900 rounded-lg p-6 space-y-4 mb-6">
                   <div>
@@ -360,6 +399,19 @@ export function Header({ activeTab, onItemScanned, currentUser: _headerUser }: H
                     </div>
                   </div>
 
+                  {/* Station Mismatch Warning Message */}
+                  {lastScanResult.stationMismatch && (
+                    <div className="bg-amber-900/30 border border-amber-600 rounded-lg p-4 mt-4">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-amber-300 font-semibold text-sm">This item belongs at the <span className="font-bold text-amber-200">{lastScanResult.item?.currentStep}</span> station.</p>
+                          <p className="text-amber-200 text-xs mt-1">Please move it to the correct department or switch stations.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {lastScanResult.item?.onHold && (
                     <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 mt-4">
                       <div className="flex items-center gap-2 text-red-400 font-semibold">
@@ -373,15 +425,53 @@ export function Header({ activeTab, onItemScanned, currentUser: _headerUser }: H
                   )}
                 </div>
 
-                <button
-                  onClick={() => {
-                    setShowScanPopup(false);
-                    focusScannerInput();
-                  }}
-                  className="w-full px-4 py-3 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg transition-colors"
-                >
-                  Continue Scanning
-                </button>
+                {/* Action Button - Conditional */}
+                {lastScanResult.stationMismatch ? (
+                  // Switch Button for Mismatch
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => {
+                        // Map step to tab
+                        const stepToTab: { [key: string]: NavTab } = {
+                          'Saw': 'Operator',
+                          'Thread': 'Operator',
+                          'CNC': 'Operator',
+                          'QC': 'QC',
+                          'Ship': 'Shipping'
+                        };
+                        const targetTab = stepToTab[lastScanResult.item?.currentStep || ''] || activeTab;
+                        onTabChange?.(targetTab);
+                        setShowScanPopup(false);
+                        focusScannerInput();
+                      }}
+                      className="w-full px-4 py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <ArrowRight className="w-5 h-5" />
+                      Switch to {lastScanResult.item?.currentStep} Station
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowScanPopup(false);
+                        focusScannerInput();
+                      }}
+                      className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold rounded-lg transition-colors"
+                    >
+                      Continue Scanning
+                    </button>
+                  </div>
+                ) : (
+                  // Go to Item Button for Match
+                  <button
+                    onClick={() => {
+                      setShowScanPopup(false);
+                      focusScannerInput();
+                    }}
+                    className="w-full px-4 py-3 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-5 h-5" />
+                    Continue Scanning
+                  </button>
+                )}
               </>
             ) : (
               <>
