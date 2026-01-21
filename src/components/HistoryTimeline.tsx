@@ -41,18 +41,6 @@ const actionColors: Record<string, { bg: string; text: string; icon: string }> =
 
 const defaultColors = { bg: 'bg-gray-700', text: 'text-gray-400', icon: 'text-gray-400' };
 
-function formatTimestamp(date: Date): string {
-  const d = date instanceof Date ? date : new Date(date);
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-}
-
 function formatTimeOnly(date: Date): string {
   const d = date instanceof Date ? date : new Date(date);
   return d.toLocaleString('en-US', {
