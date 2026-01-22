@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, LogOut, User, Scan, X, Search, AlertCircle, Dice6, AlertTriangle, Factory, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { LogOut, User, Scan, X, Search, AlertCircle, Dice6, AlertTriangle, Factory, ArrowRight, CheckCircle2 } from 'lucide-react';
 import type { NavTab, WorkItem } from '../../types';
 import type { FactoryUser } from '../../types/auth';
 
@@ -15,7 +15,7 @@ interface HeaderProps {
   readonly currentStep?: string;
 }
 
-export function Header({ activeTab, onItemScanned, onTabChange, currentUser: _headerUser, currentStep }: HeaderProps) {
+export function Header({ activeTab, onItemScanned, onTabChange, currentUser: currentStep }: HeaderProps) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const { getItemById, getAllItems } = useWorkflow();
@@ -45,13 +45,18 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: _he
     }
   }, [showScanner]);
 
-  // Clear scan result when tab or step changes
-  useEffect(() => {
+  // Clear scan result when tab or step changes - track previous values to detect changes
+  const [prevActiveTab, setPrevActiveTab] = useState(activeTab);
+  const [prevCurrentStep, setPrevCurrentStep] = useState(currentStep);
+
+  if (activeTab !== prevActiveTab || currentStep !== prevCurrentStep) {
     setLastScanResult(null);
     setShowScanPopup(false);
     setShowScanner(false);
     setScanInput('');
-  }, [activeTab, currentStep]);
+    setPrevActiveTab(activeTab);
+    setPrevCurrentStep(currentStep);
+  }
 
   // When scanner is open, refocus after ANY click (buttons included).
   useEffect(() => {
@@ -124,7 +129,7 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: _he
       setShowScanPopup(true);  // Show popup for not found
       setScanInput('');
     }
-  }, [getItemById, onItemScanned, focusScannerInput]);
+  }, [getItemById, onItemScanned, focusScannerInput, activeTab]);
 
   const handleMockScan = useCallback(() => {
     if (allItems.length === 0) return;
@@ -190,14 +195,14 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: _he
             </div>
           )}
 
-          {/* Notifications */}
+          {/* Hide for now Notifications *
           <button
             className="relative p-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Notifications"
           >
             <Bell className="w-5 h-5" />
             <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
+          </button> */}
 
           {/* User Info */}
           {currentUser && (
