@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { Factory, ShieldCheck, Truck, BarChart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { UserRole } from '../types/auth';
-import { useAuth } from '../contexts';
+import { useAuth } from '../hooks/useAuth';
 
 const roleIcons: Record<UserRole, typeof Factory> = {
   Operator: Factory,
@@ -36,18 +36,18 @@ export function LoginPage() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleRoleSelect = (role: UserRole) => {
+  const handleRoleSelect = useCallback((role: UserRole) => {
     // Create a mock user for this role
     const mockUser = {
       id: `DEMO-${role}`,
-      badgeId: role.charAt(0).toUpperCase() + Date.now().toString().slice(-3),
+      badgeId: role.charAt(0).toUpperCase() + Math.random().toString(36).slice(-3).toUpperCase(),
       name: mockNames[role],
       role,
       department: roleConfig[role].description,
     };
     login(mockUser);
     navigate('/dashboard');
-  };
+  }, [login, navigate]);
 
   const roles: UserRole[] = ['Operator', 'QC', 'Shipping', 'Supervisor'];
 

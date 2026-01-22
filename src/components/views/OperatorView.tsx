@@ -5,8 +5,7 @@ import { WORKFLOW_STEPS, HOLD_REASONS } from '../../types';
 import { WorkItemCard } from '../WorkItemCard';
 import { HistoryTimeline } from '../HistoryTimeline';
 import { ConfirmDialog } from '../ConfirmDialog';
-import { useWorkflow } from '../../contexts/WorkflowContext';
-import  {useAuth} from '../../contexts';
+import { useAuth, useWorkflow } from '../../hooks';
 
 interface OperatorViewProps {
   readonly scannedItem?: WorkItem | null;
@@ -82,14 +81,16 @@ export function OperatorView({ scannedItem, onClearScan, onStepChange }: Operato
 
   const handleStartStep = () => {
     if (!selectedItem || !currentUser) return;
-    if (startStep(selectedItem.id, currentUser.id, currentUser.name)) {
+    // Pass activeStep as operatorStation for state machine validation
+    if (startStep(selectedItem.id, currentUser.id, currentUser.name, activeStep)) {
       setSelectedItem(getItemById(selectedItem.id) || null);
     }
   };
 
   const handleCompleteStep = () => {
     if (!selectedItem || !currentUser) return;
-    if (completeStep(selectedItem.id, currentUser.id, currentUser.name)) {
+    // Pass activeStep as operatorStation for state machine validation
+    if (completeStep(selectedItem.id, currentUser.id, currentUser.name, activeStep)) {
       setSelectedItem(null);
     }
   };

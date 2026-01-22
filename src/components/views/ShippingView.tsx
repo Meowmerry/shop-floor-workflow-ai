@@ -4,9 +4,10 @@ import type { WorkItem } from '../../types';
 import { WorkItemCard } from '../WorkItemCard';
 import { HistoryTimeline } from '../HistoryTimeline';
 import { ConfirmDialog } from '../ConfirmDialog';
-import { useWorkflow } from '../../contexts/WorkflowContext';
-import { useAuth } from '../../contexts';
+
 import { generatePackingSlipHTML } from '../../utils/packingSlip';
+import { useAuth } from '../../hooks';
+import { useWorkflow } from '../../hooks';
 
 interface ShippingViewProps {
   readonly scannedItem?: WorkItem | null;
@@ -66,7 +67,8 @@ export function ShippingView({ scannedItem, onClearScan }: ShippingViewProps) {
 
   const handleStartPacking = () => {
     if (!selectedItem || !currentUser) return;
-    if (startStep(selectedItem.id, currentUser.id, currentUser.name)) {
+    // Pass 'Ship' as operatorStation for state machine validation
+    if (startStep(selectedItem.id, currentUser.id, currentUser.name, 'Ship')) {
       setSelectedItem(getItemById(selectedItem.id) || null);
     }
   };
@@ -390,7 +392,8 @@ export function ShippingView({ scannedItem, onClearScan }: ShippingViewProps) {
         onCancel={() => setShowShipConfirm(false)}
         onConfirm={() => {
           if (!selectedItem || !currentUser) return;
-          if (shipItem(selectedItem.id, currentUser.id, currentUser.name)) {
+          // Pass 'Ship' as operatorStation for state machine validation
+          if (shipItem(selectedItem.id, currentUser.id, currentUser.name, 'Ship')) {
             setSelectedItem(null);
           }
           setShowShipConfirm(false);

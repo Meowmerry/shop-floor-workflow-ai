@@ -38,6 +38,7 @@ export interface AuditEntry {
   readonly action: AuditAction | string;
   readonly operatorId: string;
   readonly operatorName: string;
+  readonly operatorStation?: WorkflowStep; // Station where action was performed (for audit integrity)
   readonly notes?: string;
 }
 

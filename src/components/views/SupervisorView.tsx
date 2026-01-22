@@ -16,7 +16,8 @@ import type { WorkItem, WorkflowStep } from '../../types';
 import { WORKFLOW_STEPS } from '../../types';
 import { WorkItemCard } from '../WorkItemCard';
 import { HistoryTimeline } from '../HistoryTimeline';
-import { useWorkflow } from '../../contexts/WorkflowContext';
+import { useWorkflow } from '../../hooks';
+
 
 interface SupervisorViewProps {
   readonly scannedItem?: WorkItem | null;

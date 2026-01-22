@@ -120,11 +120,20 @@ export function HistoryTimeline({ history, maxItems }: HistoryTimelineProps) {
                 </span>
               </div>
 
-              {/* Step badge */}
-              <div className="flex items-center gap-2 mb-2">
+              {/* Step badge and station verification */}
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="px-2.5 py-0.5 bg-gray-700 rounded text-xs text-gray-200 font-medium">
                   {entry.step}
                 </span>
+                {entry.operatorStation && (
+                  <span className={`px-2.5 py-0.5 rounded text-xs font-medium ${
+                    entry.operatorStation === entry.step
+                      ? 'bg-green-900/50 text-green-400'
+                      : 'bg-red-900/50 text-red-400'
+                  }`}>
+                    @ {entry.operatorStation}
+                  </span>
+                )}
                 {entry.notes && (
                   <span className="text-xs text-gray-500 italic">
                     {entry.notes}

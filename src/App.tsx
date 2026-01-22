@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, Factory } from 'lucide-react';
@@ -9,12 +10,14 @@ import {
   ShippingView,
   SupervisorView,
 } from './components/views';
-import { useAuth } from './contexts';
+import { useAuth } from './hooks';
 
 function App() {
   const { isAuthenticated, currentUser } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<NavTab>('Operator');
+  const [activeTab, setActiveTab] = useState<NavTab>(
+    (currentUser?.role as NavTab) ?? 'Operator'
+  );
   const [scannedItem, setScannedItem] = useState<any>(null);
   const [currentStep, setCurrentStep] = useState<string | undefined>(undefined);
 
@@ -25,12 +28,11 @@ function App() {
     }
   }, [isAuthenticated, navigate]);
 
-  // Set active tab based on user role when authenticated
-  useEffect(() => {
-    if (currentUser) {
-      setActiveTab(currentUser.role as NavTab);
-    }
-  }, [currentUser]);
+  // Sync active tab when user role changes (e.g., after login)
+  const userRole = currentUser?.role as NavTab | undefined;
+  if (userRole && userRole !== activeTab) {
+    setActiveTab(userRole);
+  }
 
   if (!isAuthenticated || !currentUser) {
     return (

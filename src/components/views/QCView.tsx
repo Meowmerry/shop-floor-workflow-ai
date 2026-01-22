@@ -5,8 +5,8 @@ import { HOLD_REASONS } from '../../types';
 import { WorkItemCard } from '../WorkItemCard';
 import { HistoryTimeline } from '../HistoryTimeline';
 import { ConfirmDialog } from '../ConfirmDialog';
-import { useWorkflow } from '../../contexts/WorkflowContext';
-import { useAuth } from '../../contexts';
+import { useAuth, useWorkflow } from '../../hooks';
+
 
 interface QCViewProps {
   readonly scannedItem?: WorkItem | null;
@@ -84,7 +84,8 @@ export function QCView({ scannedItem, onClearScan }: QCViewProps) {
 
   const handleStartInspection = () => {
     if (!selectedItem || !currentUser) return;
-    if (startStep(selectedItem.id, currentUser.id, currentUser.name)) {
+    // Pass 'QC' as operatorStation for state machine validation
+    if (startStep(selectedItem.id, currentUser.id, currentUser.name, 'QC')) {
       setSelectedItem(getItemById(selectedItem.id) || null);
     }
   };

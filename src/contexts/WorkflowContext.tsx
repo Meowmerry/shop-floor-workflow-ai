@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useState, useCallback, type ReactNode } from 'react';
 import type { WorkItem, Order, WorkflowStep, HoldReason, AuditEntry } from '../types';
 import { WORKFLOW_STEPS } from '../types';
 import { mockOrders as initialMockOrders } from '../data/mockData';
@@ -12,15 +12,15 @@ const cloneOrders = (orders: readonly Order[]): Order[] =>
     return value;
   });
 
-interface WorkflowContextType {
+export interface WorkflowContextType {
   orders: Order[];
   getAllItems: () => WorkItem[];
   getItemById: (id: string) => WorkItem | undefined;
   getOrderById: (id: string) => Order | undefined;
 
-  // Workflow actions
-  startStep: (itemId: string, operatorId: string, operatorName: string) => boolean;
-  completeStep: (itemId: string, operatorId: string, operatorName: string) => boolean;
+  // Workflow actions - operatorStation required for state machine validation
+  startStep: (itemId: string, operatorId: string, operatorName: string, operatorStation: WorkflowStep) => boolean;
+  completeStep: (itemId: string, operatorId: string, operatorName: string, operatorStation: WorkflowStep) => boolean;
   canCompleteStep: (item: WorkItem) => boolean;
   getNextStep: (currentStep: WorkflowStep) => WorkflowStep | null;
   getPreviousStep: (currentStep: WorkflowStep) => WorkflowStep | null;
@@ -32,33 +32,35 @@ interface WorkflowContextType {
   // Rework
   sendToRework: (itemId: string, operatorId: string, operatorName: string, notes?: string) => boolean;
 
-  // Shipping
-  shipItem: (itemId: string, operatorId: string, operatorName: string) => boolean;
+  // Shipping - operatorStation required for state machine validation
+  shipItem: (itemId: string, operatorId: string, operatorName: string, operatorStation: WorkflowStep) => boolean;
   canShipItem: (item: WorkItem) => { canShip: boolean; reason?: string };
 
   // QC specific
   passQC: (itemId: string, operatorId: string, operatorName: string) => boolean;
   failQC: (itemId: string, reason: HoldReason, operatorId: string, operatorName: string) => boolean;
 
-  // Intake - add new item to workflow
-  addNewItem: (itemId: string, operatorId: string, operatorName: string) => WorkItem | null;
+  // Intake - add new item to workflow with optional order association
+  addNewItem: (itemId: string, operatorId: string, operatorName: string, orderId?: string) => WorkItem | null;
 }
 
-const WorkflowContext = createContext<WorkflowContextType | null>(null);
+// eslint-disable-next-line react-refresh/only-export-components
+export const WorkflowContext = createContext<WorkflowContextType | null>(null);
 
-interface WorkflowProviderProps {
+export interface WorkflowProviderProps {
   readonly children: ReactNode;
 }
 
 // Helper to generate unique IDs
 const generateId = (): string => Math.random().toString(36).substring(2, 11);
 
-// Create audit entry helper
+// Create audit entry helper - includes operatorStation for audit integrity
 const createAuditEntry = (
   step: WorkflowStep,
   action: string,
   operatorId: string,
   operatorName: string,
+  operatorStation?: WorkflowStep,
   notes?: string
 ): AuditEntry => ({
   id: generateId(),
@@ -67,6 +69,7 @@ const createAuditEntry = (
   action,
   operatorId,
   operatorName,
+  operatorStation,
   notes,
 });
 
@@ -140,14 +143,22 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     return true;
   }, []);
 
-  // Start working on a step
+  // Start working on a step - HARDENED: validates operatorStation matches item's currentStep
   const startStep = useCallback((
     itemId: string,
     operatorId: string,
-    operatorName: string
+    operatorName: string,
+    operatorStation: WorkflowStep
   ): boolean => {
     const item = getItemById(itemId);
     if (!item) return false;
+
+    // HARDENED LOGIC: Check station permissions at the context level
+    if (operatorStation !== item.currentStep) {
+      console.warn(`Process Violation: Station ${operatorStation} cannot start work for ${item.currentStep}`);
+      return false;
+    }
+
     if (item.onHold) return false;
     if (item.status !== 'Pending') return false;
 
@@ -155,27 +166,37 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
       i.status = 'In Progress';
       i.auditHistory = [
         ...i.auditHistory,
-        createAuditEntry(i.currentStep, 'Started', operatorId, operatorName),
+        createAuditEntry(i.currentStep, 'Started', operatorId, operatorName, operatorStation),
       ];
     });
     return true;
   }, [getItemById, updateItem]);
 
-  // Complete current step and move to next
+  // Complete current step and move to next - HARDENED: validates operatorStation matches item's currentStep
   const completeStep = useCallback((
     itemId: string,
     operatorId: string,
-    operatorName: string
+    operatorName: string,
+    operatorStation: WorkflowStep
   ): boolean => {
     const item = getItemById(itemId);
-    if (!item || !canCompleteStep(item)) return false;
+    if (!item) return false;
+
+    // HARDENED LOGIC: Check station permissions at the context level
+    if (operatorStation !== item.currentStep) {
+      console.warn(`Process Violation: Station ${operatorStation} cannot complete work for ${item.currentStep}`);
+      return false;
+    }
+
+    if (!canCompleteStep(item)) return false;
 
     const nextStep = getNextStep(item.currentStep);
 
     updateItem(itemId, (i) => {
+      // Record the operatorStation in audit history for audit integrity
       i.auditHistory = [
         ...i.auditHistory,
-        createAuditEntry(i.currentStep, 'Completed', operatorId, operatorName),
+        createAuditEntry(i.currentStep, 'Completed', operatorId, operatorName, operatorStation),
       ];
 
       if (nextStep) {
@@ -206,7 +227,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
       i.holdTimestamp = new Date();
       i.auditHistory = [
         ...i.auditHistory,
-        createAuditEntry(i.currentStep, 'Placed on Hold', operatorId, operatorName, `Reason: ${reason}`),
+        createAuditEntry(i.currentStep, 'Placed on Hold', operatorId, operatorName, undefined, `Reason: ${reason}`),
       ];
     });
     return true;
@@ -234,6 +255,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
           'Released from Hold',
           operatorId,
           operatorName,
+          undefined,
           previousReason ? `Was held for: ${previousReason}` : undefined
         ),
       ];
@@ -265,6 +287,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
           'Sent to Rework',
           operatorId,
           operatorName,
+          undefined,
           notes || `Returned from ${previousStep} to Saw for rework`
         ),
       ];
@@ -286,14 +309,21 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     return { canShip: true };
   }, []);
 
-  // Ship item
+  // Ship item - HARDENED: validates operatorStation matches 'Ship'
   const shipItem = useCallback((
     itemId: string,
     operatorId: string,
-    operatorName: string
+    operatorName: string,
+    operatorStation: WorkflowStep
   ): boolean => {
     const item = getItemById(itemId);
     if (!item) return false;
+
+    // HARDENED LOGIC: Check station permissions at the context level
+    if (operatorStation !== 'Ship') {
+      console.warn(`Process Violation: Station ${operatorStation} cannot ship items`);
+      return false;
+    }
 
     const { canShip } = canShipItem(item);
     if (!canShip) return false;
@@ -302,7 +332,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
       i.status = 'Completed';
       i.auditHistory = [
         ...i.auditHistory,
-        createAuditEntry(i.currentStep, 'Shipped', operatorId, operatorName),
+        createAuditEntry(i.currentStep, 'Shipped', operatorId, operatorName, operatorStation),
       ];
     });
     return true;
@@ -322,7 +352,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     updateItem(itemId, (i) => {
       i.auditHistory = [
         ...i.auditHistory,
-        createAuditEntry(i.currentStep, 'Passed QC', operatorId, operatorName),
+        createAuditEntry(i.currentStep, 'Passed QC', operatorId, operatorName, 'QC'),
       ];
       i.currentStep = 'Ship';
       i.status = 'Pending';
@@ -347,26 +377,49 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
       i.holdTimestamp = new Date();
       i.auditHistory = [
         ...i.auditHistory,
-        createAuditEntry(i.currentStep, 'Failed QC', operatorId, operatorName, `Reason: ${reason}`),
+        createAuditEntry(i.currentStep, 'Failed QC', operatorId, operatorName, 'QC', `Reason: ${reason}`),
       ];
     });
     return true;
   }, [getItemById, updateItem]);
 
+  // General Stock order ID for items without specific customer orders
+  const GENERAL_STOCK_ORDER_ID = 'GENERAL-STOCK';
+
   // Add new item to workflow (intake at Saw station)
+  // If orderId is provided and valid, link to that order; otherwise use General Stock
   const addNewItem = useCallback((
     itemId: string,
     operatorId: string,
-    operatorName: string
+    operatorName: string,
+    orderId?: string
   ): WorkItem | null => {
     // Check if item already exists
     const existingItem = getItemById(itemId);
     if (existingItem) return null;
 
     const now = new Date();
+
+    // Determine which order to associate with
+    let targetOrderId = GENERAL_STOCK_ORDER_ID;
+    let orderNote = 'Item added to General Stock via scanner intake';
+
+    if (orderId && orderId.trim()) {
+      // Check if the provided order ID exists
+      const existingOrder = orders.find((o) => o.id === orderId.trim());
+      if (existingOrder) {
+        targetOrderId = orderId.trim();
+        orderNote = `Item added to order ${existingOrder.orderNumber} via scanner intake`;
+      } else {
+        // Order ID provided but not found - still use it but note it's unverified
+        targetOrderId = orderId.trim();
+        orderNote = `Item added to order ${orderId} (unverified) via scanner intake`;
+      }
+    }
+
     const newItem: WorkItem = {
       id: itemId,
-      orderId: 'INTAKE',
+      orderId: targetOrderId,
       name: `Intake Item ${itemId}`,
       description: 'Item added via barcode intake',
       quantity: 1,
@@ -375,37 +428,60 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
       onHold: false,
       priority: 'Normal',
       auditHistory: [
-        createAuditEntry('Saw', 'Created', operatorId, operatorName, 'Item added to workflow via scanner intake'),
+        createAuditEntry('Saw', 'Created', operatorId, operatorName, 'Saw', orderNote),
       ],
       createdAt: now,
       updatedAt: now,
     };
 
-    // Add to the first order or create intake order
     setOrders((prevOrders) => {
-      const intakeOrder = prevOrders.find((o) => o.id === 'INTAKE-ORDER');
-      if (intakeOrder) {
+      // If linking to an existing order, add item to that order
+      const existingOrder = prevOrders.find((o) => o.id === targetOrderId);
+      if (existingOrder) {
         return prevOrders.map((order) =>
-          order.id === 'INTAKE-ORDER'
+          order.id === targetOrderId
             ? { ...order, items: [...order.items, newItem] }
             : order
         );
-      } else {
-        // Create new intake order
-        const newOrder: Order = {
-          id: 'INTAKE-ORDER',
-          customerName: 'Intake Items',
-          orderNumber: 'INTAKE-001',
-          items: [newItem],
-          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-          createdAt: now,
-        };
-        return [...prevOrders, newOrder];
       }
+
+      // If it's General Stock or a new order ID, create/find General Stock order
+      if (targetOrderId === GENERAL_STOCK_ORDER_ID) {
+        const generalStockOrder = prevOrders.find((o) => o.id === GENERAL_STOCK_ORDER_ID);
+        if (generalStockOrder) {
+          return prevOrders.map((order) =>
+            order.id === GENERAL_STOCK_ORDER_ID
+              ? { ...order, items: [...order.items, newItem] }
+              : order
+          );
+        } else {
+          // Create new General Stock order
+          const newOrder: Order = {
+            id: GENERAL_STOCK_ORDER_ID,
+            customerName: 'General Stock',
+            orderNumber: 'STOCK-001',
+            items: [newItem],
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+            createdAt: now,
+          };
+          return [...prevOrders, newOrder];
+        }
+      }
+
+      // For unverified order IDs, create a placeholder order
+      const newOrder: Order = {
+        id: targetOrderId,
+        customerName: `Order ${targetOrderId}`,
+        orderNumber: targetOrderId,
+        items: [newItem],
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+        createdAt: now,
+      };
+      return [...prevOrders, newOrder];
     });
 
     return newItem;
-  }, [getItemById]);
+  }, [getItemById, orders]);
 
   return (
     <WorkflowContext.Provider
@@ -434,10 +510,3 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
   );
 }
 
-export function useWorkflow(): WorkflowContextType {
-  const context = useContext(WorkflowContext);
-  if (!context) {
-    throw new Error('useWorkflow must be used within a WorkflowProvider');
-  }
-  return context;
-}

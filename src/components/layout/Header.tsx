@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, User, Scan, X, Search, Dice6, AlertTriangle, Factory, ArrowRight, CheckCircle2, Plus, Eye } from 'lucide-react';
 import type { NavTab, WorkItem } from '../../types';
 import type { FactoryUser } from '../../types/auth';
+import { useAuth, useWorkflow } from '../../hooks';
 
-import { useWorkflow } from '../../contexts/WorkflowContext';
-import { useAuth } from '../../contexts';
 
 interface HeaderProps {
   readonly activeTab: NavTab;
@@ -18,7 +17,7 @@ interface HeaderProps {
 export function Header({ activeTab, onItemScanned, onTabChange, currentStep }: HeaderProps) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
-  const { getItemById, getAllItems, addNewItem } = useWorkflow();
+  const { getItemById, getAllItems, addNewItem, orders } = useWorkflow();
 
   // Check if current user is in read-only mode (Supervisor)
   const isReadOnly = currentUser?.role === 'Supervisor';
@@ -27,7 +26,9 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentStep }: H
   const [showScanner, setShowScanner] = useState(false);
   const [lastScanResult, setLastScanResult] = useState<{ found: boolean; item?: WorkItem; barcode: string; stationMismatch?: boolean } | null>(null);
   const [showScanPopup, setShowScanPopup] = useState(false);
+  const [orderIdInput, setOrderIdInput] = useState(''); // For associating new items with orders
   const inputRef = useRef<HTMLInputElement>(null);
+  const orderIdInputRef = useRef<HTMLInputElement>(null);
 
   const focusScannerInput = useCallback(() => {
     // next-tick focus to recover from button clicks / modal interactions
@@ -216,7 +217,8 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentStep }: H
             </div>
           )}
 
-          {/* Hide for now Notifications *
+          {/**
+           *  Todo Hide for now Notifications
           <button
             className="relative p-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Notifications"
@@ -556,6 +558,7 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentStep }: H
                   <button
                     onClick={() => {
                       setShowScanPopup(false);
+                      setOrderIdInput('');
                       focusScannerInput();
                     }}
                     className="p-2 text-gray-400 hover:text-white transition-colors"
@@ -580,12 +583,73 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentStep }: H
                     <p className="font-mono text-xl text-blue-400 font-bold mt-2">{lastScanResult.barcode}</p>
                   </div>
 
+                  {/* Order Association Input - Red Flag #2 Fix with validation */}
+                  {(() => {
+                    const trimmedOrderId = orderIdInput.trim();
+                    const matchedOrder = trimmedOrderId
+                      ? orders.find((o) => o.id === trimmedOrderId || o.orderNumber === trimmedOrderId)
+                      : null;
+                    const isValidOrder = !trimmedOrderId || matchedOrder !== undefined;
+
+                    return (
+                      <div className="mt-4 pt-4 border-t border-gray-700">
+                        <label htmlFor="orderIdInput" className="text-xs text-gray-500 uppercase tracking-wider block mb-2">
+                          Associate with Order ID (optional)
+                        </label>
+                        <input
+                          ref={orderIdInputRef}
+                          id="orderIdInput"
+                          type="text"
+                          value={orderIdInput}
+                          onChange={(e) => setOrderIdInput(e.target.value)}
+                          placeholder="Enter Order ID or leave blank for General Stock"
+                          className={`w-full px-4 py-3 bg-gray-800 border rounded-lg text-white placeholder-gray-500 focus:ring-2 transition-all font-mono ${
+                            trimmedOrderId
+                              ? isValidOrder
+                                ? 'border-green-600 focus:border-green-500 focus:ring-green-500/20'
+                                : 'border-amber-600 focus:border-amber-500 focus:ring-amber-500/20'
+                              : 'border-gray-600 focus:border-blue-500 focus:ring-blue-500/20'
+                          }`}
+                          autoComplete="off"
+                        />
+                        {/* Order validation feedback */}
+                        {trimmedOrderId ? (
+                          matchedOrder ? (
+                            <p className="text-xs text-green-400 mt-2 flex items-center gap-1">
+                              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                              Found: {matchedOrder.customerName} ({matchedOrder.orderNumber})
+                            </p>
+                          ) : (
+                            <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
+                              <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+                              Order not found - will create placeholder order
+                            </p>
+                          )
+                        ) : (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Will be added to General Stock if no order specified
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <div className="mt-4 pt-4 border-t border-gray-700">
                     <p className="text-xs text-gray-500 uppercase tracking-wider">Will be added as</p>
-                    <div className="flex items-center gap-3 mt-2">
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
                       <span className="px-3 py-1 bg-blue-900/50 text-blue-400 rounded text-sm font-medium">Saw Station</span>
                       <span className="text-gray-500">•</span>
                       <span className="px-3 py-1 bg-yellow-900/50 text-yellow-400 rounded text-sm font-medium">Pending</span>
+                      <span className="text-gray-500">•</span>
+                      <span className={`px-3 py-1 rounded text-sm font-medium ${
+                        orderIdInput.trim()
+                          ? orders.find((o) => o.id === orderIdInput.trim() || o.orderNumber === orderIdInput.trim())
+                            ? 'bg-green-900/50 text-green-400'
+                            : 'bg-amber-900/50 text-amber-400'
+                          : 'bg-purple-900/50 text-purple-400'
+                      }`}>
+                        {orderIdInput.trim() || 'General Stock'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -594,11 +658,12 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentStep }: H
                   <button
                     onClick={() => {
                       if (isReadOnly) return;
-                      // Add new item to workflow
+                      // Add new item to workflow with optional order association
                       const newItem = addNewItem(
                         lastScanResult.barcode,
                         currentUser?.id || 'SYSTEM',
-                        currentUser?.name || 'System'
+                        currentUser?.name || 'System',
+                        orderIdInput.trim() || undefined // Pass order ID if provided
                       );
                       if (newItem) {
                         // Navigate to Operator tab (Saw station) and select the new item
@@ -607,6 +672,7 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentStep }: H
                         setShowScanPopup(false);
                         setShowScanner(false);
                         setScanInput('');
+                        setOrderIdInput('');
                       }
                     }}
                     disabled={isReadOnly}
@@ -631,6 +697,7 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentStep }: H
                   <button
                     onClick={() => {
                       setShowScanPopup(false);
+                      setOrderIdInput('');
                       focusScannerInput();
                     }}
                     className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold rounded-lg transition-colors"
