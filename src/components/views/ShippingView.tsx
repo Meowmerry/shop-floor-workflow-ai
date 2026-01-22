@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Package, Truck, CheckCircle, Printer, MapPin, AlertTriangle, History, AlertOctagon, Eye } from 'lucide-react';
+import { useState } from 'react';
+import { Package, Truck, CheckCircle, Printer, MapPin, AlertTriangle, History, AlertOctagon, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import type { WorkItem } from '../../types';
 import { WorkItemCard } from '../WorkItemCard';
 import { HistoryTimeline } from '../HistoryTimeline';
@@ -28,19 +28,23 @@ export function ShippingView({ scannedItem, onClearScan }: ShippingViewProps) {
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showShipConfirm, setShowShipConfirm] = useState(false);
+  const [expandedPending, setExpandedPending] = useState(true);
+  const [expandedHold, setExpandedHold] = useState(true);
+  const [expandedShipped, setExpandedShipped] = useState(true);
 
   // Check if current user is Supervisor
   const isSupervisor = currentUser?.role === 'Supervisor';
 
-  // Handle scanned item from parent
-  useEffect(() => {
-    if (scannedItem) {
-      const freshItem = getItemById(scannedItem.id);
-      if (freshItem) {
-        setSelectedItem(freshItem);
-      }
+  // Handle scanned item from parent - update selection when scannedItem changes
+  const [lastScannedId, setLastScannedId] = useState<string | null>(null);
+
+  if (scannedItem && scannedItem.id !== lastScannedId) {
+    const freshItem = getItemById(scannedItem.id);
+    if (freshItem) {
+      setSelectedItem(freshItem);
+      setLastScannedId(scannedItem.id);
     }
-  }, [scannedItem, getItemById]);
+  }
 
   // Get items at Ship step
   const allItems = getAllItems();
@@ -126,54 +130,86 @@ export function ShippingView({ scannedItem, onClearScan }: ShippingViewProps) {
         <div className="lg:col-span-2 space-y-6">
           {/* Ready to Ship */}
           <section>
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+            <button
+              onClick={() => setExpandedPending(!expandedPending)}
+              className="w-full text-lg font-semibold text-white flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity group"
+            >
+              {expandedPending ? (
+                <ChevronUp className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+              )}
               <Package className="w-5 h-5 text-blue-400" />
               Ready to Pack & Ship
               <span className="ml-auto text-sm font-normal text-gray-400">{pendingShip.length} items</span>
-            </h3>
-            {pendingShip.length > 0 ? (
-              <div className="space-y-3">
-                {pendingShip.map((item) => (
-                  <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
-                ))}
-              </div>
-            ) : (
-              <div className="bg-gray-800 rounded-lg p-6 text-center">
-                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-                <p className="text-gray-400">All items have been shipped!</p>
-              </div>
+            </button>
+            {expandedPending && (
+              <>
+                {pendingShip.length > 0 ? (
+                  <div className="space-y-3">
+                    {pendingShip.map((item) => (
+                      <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-800 rounded-lg p-6 text-center">
+                    <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                    <p className="text-gray-400">All items have been shipped!</p>
+                  </div>
+                )}
+              </>
             )}
           </section>
 
           {/* Items on Hold */}
           {holdItems.length > 0 && (
             <section>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setExpandedHold(!expandedHold)}
+                className="w-full text-lg font-semibold text-white flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity group"
+              >
+                {expandedHold ? (
+                  <ChevronUp className="w-5 h-5 text-red-400 group-hover:scale-110 transition-transform" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-red-400 group-hover:scale-110 transition-transform" />
+                )}
                 <AlertTriangle className="w-5 h-5 text-red-400" />
                 Blocked - On Hold
                 <span className="ml-auto text-sm font-normal text-gray-400">{holdItems.length} items</span>
-              </h3>
-              <div className="space-y-3">
-                {holdItems.map((item) => (
-                  <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
-                ))}
-              </div>
+              </button>
+              {expandedHold && (
+                <div className="space-y-3">
+                  {holdItems.map((item) => (
+                    <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
+                  ))}
+                </div>
+              )}
             </section>
           )}
 
           {/* Recently Shipped */}
           {shippedItems.length > 0 && (
             <section>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setExpandedShipped(!expandedShipped)}
+                className="w-full text-lg font-semibold text-white flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity group"
+              >
+                {expandedShipped ? (
+                  <ChevronUp className="w-5 h-5 text-green-400 group-hover:scale-110 transition-transform" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-green-400 group-hover:scale-110 transition-transform" />
+                )}
                 <Truck className="w-5 h-5 text-green-400" />
                 Recently Shipped
                 <span className="ml-auto text-sm font-normal text-gray-400">{shippedItems.length} items</span>
-              </h3>
-              <div className="space-y-3">
-                {shippedItems.map((item) => (
-                  <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
-                ))}
-              </div>
+              </button>
+              {expandedShipped && (
+                <div className="space-y-3">
+                  {shippedItems.map((item) => (
+                    <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
+                  ))}
+                </div>
+              )}
             </section>
           )}
         </div>

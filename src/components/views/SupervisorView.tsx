@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   BarChart3,
   AlertTriangle,
@@ -9,6 +9,8 @@ import {
   Timer,
   History,
   AlertOctagon,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import type { WorkItem, WorkflowStep } from '../../types';
 import { WORKFLOW_STEPS } from '../../types';
@@ -41,16 +43,20 @@ export function SupervisorView({ scannedItem, onClearScan }: SupervisorViewProps
 
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [expandedAgingHolds, setExpandedAgingHolds] = useState(true);
+  const [expandedRecentHolds, setExpandedRecentHolds] = useState(true);
+  const [expandedUrgent, setExpandedUrgent] = useState(true);
 
-  // Handle scanned item from parent
-  useEffect(() => {
-    if (scannedItem) {
-      const freshItem = getItemById(scannedItem.id);
-      if (freshItem) {
-        setSelectedItem(freshItem);
-      }
+  // Handle scanned item from parent - update selection when scannedItem changes
+  const [lastScannedId, setLastScannedId] = useState<string | null>(null);
+
+  if (scannedItem && scannedItem.id !== lastScannedId) {
+    const freshItem = getItemById(scannedItem.id);
+    if (freshItem) {
+      setSelectedItem(freshItem);
+      setLastScannedId(scannedItem.id);
     }
-  }, [scannedItem, getItemById]);
+  }
 
   const allItems = getAllItems();
 
@@ -208,76 +214,108 @@ export function SupervisorView({ scannedItem, onClearScan }: SupervisorViewProps
           {/* Aging Holds - Critical Items */}
           {agingHolds.length > 0 && (
             <section>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setExpandedAgingHolds(!expandedAgingHolds)}
+                className="w-full text-lg font-semibold text-white flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity group"
+              >
+                {expandedAgingHolds ? (
+                  <ChevronUp className="w-5 h-5 text-red-500 group-hover:scale-110 transition-transform" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-red-500 group-hover:scale-110 transition-transform" />
+                )}
                 <Timer className="w-5 h-5 text-red-500 animate-pulse" />
                 Aging Holds (&gt; 24 Hours)
                 <span className="ml-auto text-sm font-normal text-red-400">{agingHolds.length} items</span>
-              </h3>
-              <div className="space-y-3">
-                {agingHolds.map((item) => {
-                  const hoursSinceHold = item.holdTimestamp ? getHoursSince(item.holdTimestamp) : 0;
-                  return (
-                    <div key={item.id} className="relative">
-                      {/* Time Badge */}
-                      <div className="absolute -top-2 -right-2 z-10 flex items-center gap-1 px-2 py-1 bg-red-600 rounded-full text-xs font-bold text-white">
-                        <Timer className="w-3 h-3" />
-                        {formatDuration(hoursSinceHold)}
+              </button>
+              {expandedAgingHolds && (
+                <div className="space-y-3">
+                  {agingHolds.map((item) => {
+                    const hoursSinceHold = item.holdTimestamp ? getHoursSince(item.holdTimestamp) : 0;
+                    return (
+                      <div key={item.id} className="relative">
+                        {/* Time Badge */}
+                        <div className="absolute -top-2 -right-2 z-10 flex items-center gap-1 px-2 py-1 bg-red-600 rounded-full text-xs font-bold text-white">
+                          <Timer className="w-3 h-3" />
+                          {formatDuration(hoursSinceHold)}
+                        </div>
+                        <div className="border-2 border-red-600 rounded-lg">
+                          <WorkItemCard item={item} onClick={handleItemClick} />
+                        </div>
                       </div>
-                      <div className="border-2 border-red-600 rounded-lg">
-                        <WorkItemCard item={item} onClick={handleItemClick} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           )}
 
           {/* Recent Holds */}
           <section>
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+            <button
+              onClick={() => setExpandedRecentHolds(!expandedRecentHolds)}
+              className="w-full text-lg font-semibold text-white flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity group"
+            >
+              {expandedRecentHolds ? (
+                <ChevronUp className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition-transform" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition-transform" />
+              )}
               <AlertTriangle className="w-5 h-5 text-yellow-400" />
               Recent Holds (&lt; 24 Hours)
               <span className="ml-auto text-sm font-normal text-gray-400">{recentHolds.length} items</span>
-            </h3>
-            {recentHolds.length > 0 ? (
-              <div className="space-y-3 max-h-80 overflow-y-auto">
-                {recentHolds.map((item) => {
-                  const hoursSinceHold = item.holdTimestamp ? getHoursSince(item.holdTimestamp) : 0;
-                  return (
-                    <div key={item.id} className="relative">
-                      {item.holdTimestamp && (
-                        <div className="absolute -top-2 -right-2 z-10 flex items-center gap-1 px-2 py-1 bg-yellow-600 rounded-full text-xs font-bold text-white">
-                          <Clock className="w-3 h-3" />
-                          {formatDuration(hoursSinceHold)}
+            </button>
+            {expandedRecentHolds && (
+              <>
+                {recentHolds.length > 0 ? (
+                  <div className="space-y-3 max-h-80 overflow-y-auto">
+                    {recentHolds.map((item) => {
+                      const hoursSinceHold = item.holdTimestamp ? getHoursSince(item.holdTimestamp) : 0;
+                      return (
+                        <div key={item.id} className="relative">
+                          {item.holdTimestamp && (
+                            <div className="absolute -top-2 -right-2 z-10 flex items-center gap-1 px-2 py-1 bg-yellow-600 rounded-full text-xs font-bold text-white">
+                              <Clock className="w-3 h-3" />
+                              {formatDuration(hoursSinceHold)}
+                            </div>
+                          )}
+                          <WorkItemCard item={item} onClick={handleItemClick} />
                         </div>
-                      )}
-                      <WorkItemCard item={item} onClick={handleItemClick} />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="bg-gray-800 rounded-lg p-6 text-center">
-                <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-2" />
-                <p className="text-gray-400">No items on hold</p>
-              </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-gray-800 rounded-lg p-6 text-center">
+                    <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-2" />
+                    <p className="text-gray-400">No items on hold</p>
+                  </div>
+                )}
+              </>
             )}
           </section>
 
           {/* Urgent Items */}
           {urgentItems.length > 0 && (
             <section>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setExpandedUrgent(!expandedUrgent)}
+                className="w-full text-lg font-semibold text-white flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity group"
+              >
+                {expandedUrgent ? (
+                  <ChevronUp className="w-5 h-5 text-orange-400 group-hover:scale-110 transition-transform" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-orange-400 group-hover:scale-110 transition-transform" />
+                )}
                 <Clock className="w-5 h-5 text-orange-400" />
                 Urgent Items
                 <span className="ml-auto text-sm font-normal text-gray-400">{urgentItems.length} items</span>
-              </h3>
-              <div className="space-y-3 max-h-80 overflow-y-auto">
-                {urgentItems.map((item) => (
-                  <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
-                ))}
-              </div>
+              </button>
+              {expandedUrgent && (
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {urgentItems.map((item) => (
+                    <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
+                  ))}
+                </div>
+              )}
             </section>
           )}
 

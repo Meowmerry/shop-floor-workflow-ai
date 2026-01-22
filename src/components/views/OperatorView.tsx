@@ -45,24 +45,25 @@ export function OperatorView({ scannedItem, onClearScan, onStepChange }: Operato
     onStepChange?.(activeStep);
   }, [activeStep, onStepChange]);
 
-  // Handle scanned item from parent
-  useEffect(() => {
-    if (scannedItem) {
-      const freshItem = getItemById(scannedItem.id);
-      if (freshItem) {
-        // Check if item's current step matches active tab
-        if (freshItem.currentStep !== activeStep) {
-          // Department mismatch - show warning
-          setSelectedItem(freshItem);
-          setDepartmentMismatch(true);
-        } else {
-          // Item is at correct department - select it normally
-          setSelectedItem(freshItem);
-          setDepartmentMismatch(false);
-        }
+  // Handle scanned item from parent - update selection when scannedItem changes
+  const [lastScannedId, setLastScannedId] = useState<string | null>(null);
+
+  if (scannedItem && scannedItem.id !== lastScannedId) {
+    const freshItem = getItemById(scannedItem.id);
+    if (freshItem) {
+      // Check if item's current step matches active tab
+      if (freshItem.currentStep !== activeStep) {
+        // Department mismatch - show warning
+        setSelectedItem(freshItem);
+        setDepartmentMismatch(true);
+      } else {
+        // Item is at correct department - select it normally
+        setSelectedItem(freshItem);
+        setDepartmentMismatch(false);
       }
+      setLastScannedId(scannedItem.id);
     }
-  }, [scannedItem, getItemById, activeStep]);
+  }
 
   // Get items for the active step
   const allItems = getAllItems();

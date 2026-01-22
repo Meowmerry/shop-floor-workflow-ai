@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, AlertTriangle, ClipboardList, RotateCcw, History, Eye } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle, XCircle, AlertTriangle, ClipboardList, RotateCcw, History, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import type { WorkItem, HoldReason } from '../../types';
 import { HOLD_REASONS } from '../../types';
 import { WorkItemCard } from '../WorkItemCard';
@@ -30,6 +30,9 @@ export function QCView({ scannedItem, onClearScan }: QCViewProps) {
   const [failReason, setFailReason] = useState<HoldReason | ''>('');
   const [showHistory, setShowHistory] = useState(false);
   const [showReworkConfirm, setShowReworkConfirm] = useState(false);
+  const [expandedPending, setExpandedPending] = useState(true);
+  const [expandedInProgress, setExpandedInProgress] = useState(true);
+  const [expandedHold, setExpandedHold] = useState(true);
   const [checklist, setChecklist] = useState<Record<string, boolean>>({
     'Dimensional Check': false,
     'Surface Finish': false,
@@ -50,16 +53,17 @@ export function QCView({ scannedItem, onClearScan }: QCViewProps) {
   };
 
 
-  // Handle scanned item from parent
-  useEffect(() => {
-    if (scannedItem) {
-      const freshItem = getItemById(scannedItem.id);
-      if (freshItem) {
-        setSelectedItem(freshItem);
-        resetChecklist();
-      }
+  // Handle scanned item from parent - update selection when scannedItem changes
+  const [lastScannedId, setLastScannedId] = useState<string | null>(null);
+
+  if (scannedItem && scannedItem.id !== lastScannedId) {
+    const freshItem = getItemById(scannedItem.id);
+    if (freshItem) {
+      setSelectedItem(freshItem);
+      resetChecklist();
+      setLastScannedId(scannedItem.id);
     }
-  }, [scannedItem, getItemById]);
+  }
 
 
   // Get items at QC step
@@ -150,56 +154,88 @@ export function QCView({ scannedItem, onClearScan }: QCViewProps) {
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* QC Queue */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">    
           {/* Pending Inspection */}
           <section>
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+            <button
+              onClick={() => setExpandedPending(!expandedPending)}
+              className="w-full text-lg font-semibold text-white flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity group"
+            >
+              {expandedPending ? (
+                <ChevronUp className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+              )}
               <ClipboardList className="w-5 h-5 text-blue-400" />
               Pending Inspection
               <span className="ml-auto text-sm font-normal text-gray-400">{pendingItems.length} items</span>
-            </h3>
-            {pendingItems.length > 0 ? (
-              <div className="space-y-3">
-                {pendingItems.map((item) => (
-                  <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
-                ))}
-              </div>
-            ) : (
-              <div className="bg-gray-800 rounded-lg p-6 text-center">
-                <p className="text-gray-400">No items pending inspection</p>
-              </div>
+            </button>
+            {expandedPending && (
+              <>
+                {pendingItems.length > 0 ? (
+                  <div className="space-y-3">
+                    {pendingItems.map((item) => (
+                      <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-800 rounded-lg p-6 text-center">
+                    <p className="text-gray-400">No items pending inspection</p>
+                  </div>
+                )}
+              </>
             )}
           </section>
 
           {/* In Progress Inspection */}
           {inProgressItems.length > 0 && (
             <section>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setExpandedInProgress(!expandedInProgress)}
+                className="w-full text-lg font-semibold text-white flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity group"
+              >
+                {expandedInProgress ? (
+                  <ChevronUp className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition-transform" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition-transform" />
+                )}
                 <ClipboardList className="w-5 h-5 text-yellow-400" />
                 In Progress
                 <span className="ml-auto text-sm font-normal text-gray-400">{inProgressItems.length} items</span>
-              </h3>
-              <div className="space-y-3">
-                {inProgressItems.map((item) => (
-                  <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
-                ))}
-              </div>
+              </button>
+              {expandedInProgress && (
+                <div className="space-y-3">
+                  {inProgressItems.map((item) => (
+                    <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
+                  ))}
+                </div>
+              )}
             </section>
           )}
 
           {/* On Hold */}
           {holdItems.length > 0 && (
             <section>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setExpandedHold(!expandedHold)}
+                className="w-full text-lg font-semibold text-white flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity group"
+              >
+                {expandedHold ? (
+                  <ChevronUp className="w-5 h-5 text-red-400 group-hover:scale-110 transition-transform" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-red-400 group-hover:scale-110 transition-transform" />
+                )}
                 <AlertTriangle className="w-5 h-5 text-red-400" />
                 Items on Hold
                 <span className="ml-auto text-sm font-normal text-gray-400">{holdItems.length} items</span>
-              </h3>
-              <div className="space-y-3">
-                {holdItems.map((item) => (
-                  <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
-                ))}
-              </div>
+              </button>
+              {expandedHold && (
+                <div className="space-y-3">
+                  {holdItems.map((item) => (
+                    <WorkItemCard key={item.id} item={item} onClick={handleItemClick} />
+                  ))}
+                </div>
+              )}
             </section>
           )}
         </div>
