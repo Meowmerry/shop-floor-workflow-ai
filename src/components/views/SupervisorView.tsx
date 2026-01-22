@@ -28,19 +28,31 @@ function getHoursSince(date: Date): number {
   return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60));
 }
 
-// Helper to format duration
-function formatDuration(hours: number): string {
-  if (hours < 24) {
-    return `${hours}h`;
+function getDurationHMS(date: Date) {
+  const totalSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return { hours, minutes, seconds };
+}
+
+function formatDurationHMS(date: Date): string {
+  const { hours, minutes, seconds } = getDurationHMS(date);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
   }
-  const days = Math.floor(hours / 24);
-  const remainingHours = hours % 24;
-  return `${days}d ${remainingHours}h`;
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
 }
 
 export function SupervisorView({ scannedItem, onClearScan }: SupervisorViewProps) {
   const { orders, getAllItems, getItemById, getOrderById } = useWorkflow();
-
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [expandedAgingHolds, setExpandedAgingHolds] = useState(true);
@@ -230,13 +242,12 @@ export function SupervisorView({ scannedItem, onClearScan }: SupervisorViewProps
               {expandedAgingHolds && (
                 <div className="space-y-3">
                   {agingHolds.map((item) => {
-                    const hoursSinceHold = item.holdTimestamp ? getHoursSince(item.holdTimestamp) : 0;
                     return (
                       <div key={item.id} className="relative">
                         {/* Time Badge */}
-                        <div className="absolute -top-2 -right-2 z-10 flex items-center gap-1 px-2 py-1 bg-red-600 rounded-full text-xs font-bold text-white">
+                        <div className="absolute -right-3 z-10 flex items-center gap-1 px-2 py-1 bg-red-600 rounded-full text-xs font-bold text-white">
                           <Timer className="w-3 h-3" />
-                          {formatDuration(hoursSinceHold)}
+                          {item.holdTimestamp && formatDurationHMS(item.holdTimestamp)}
                         </div>
                         <div className="border-2 border-red-600 rounded-lg">
                           <WorkItemCard item={item} onClick={handleItemClick} />
@@ -269,13 +280,12 @@ export function SupervisorView({ scannedItem, onClearScan }: SupervisorViewProps
                 {recentHolds.length > 0 ? (
                   <div className="space-y-3 max-h-80 overflow-y-auto">
                     {recentHolds.map((item) => {
-                      const hoursSinceHold = item.holdTimestamp ? getHoursSince(item.holdTimestamp) : 0;
                       return (
                         <div key={item.id} className="relative">
                           {item.holdTimestamp && (
-                            <div className="absolute -top-2 -right-2 z-10 flex items-center gap-1 px-2 py-1 bg-yellow-600 rounded-full text-xs font-bold text-white">
+                            <div className="absolute right-2 z-10 flex items-center gap-1 px-2 py-1 bg-yellow-600 rounded-full text-xs font-bold text-white">
                               <Clock className="w-3 h-3" />
-                              {formatDuration(hoursSinceHold)}
+                              {item.holdTimestamp && formatDurationHMS(item.holdTimestamp)}
                             </div>
                           )}
                           <WorkItemCard item={item} onClick={handleItemClick} />
@@ -376,7 +386,7 @@ export function SupervisorView({ scannedItem, onClearScan }: SupervisorViewProps
                     {currentItem.holdTimestamp && (
                       <div className="flex items-center gap-1 text-red-300 text-sm">
                         <Timer className="w-4 h-4" />
-                        {formatDuration(getHoursSince(currentItem.holdTimestamp))}
+                        {currentItem.holdTimestamp && formatDurationHMS(currentItem.holdTimestamp)}
                       </div>
                     )}
                   </div>

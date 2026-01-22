@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Scan, X, Search, AlertCircle, Dice6, AlertTriangle, Factory, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { LogOut, User, Scan, X, Search, Dice6, AlertTriangle, Factory, ArrowRight, CheckCircle2, Plus, Eye } from 'lucide-react';
 import type { NavTab, WorkItem } from '../../types';
 import type { FactoryUser } from '../../types/auth';
 
@@ -15,10 +15,13 @@ interface HeaderProps {
   readonly currentStep?: string;
 }
 
-export function Header({ activeTab, onItemScanned, onTabChange, currentUser: currentStep }: HeaderProps) {
+export function Header({ activeTab, onItemScanned, onTabChange, currentStep }: HeaderProps) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
-  const { getItemById, getAllItems } = useWorkflow();
+  const { getItemById, getAllItems, addNewItem } = useWorkflow();
+
+  // Check if current user is in read-only mode (Supervisor)
+  const isReadOnly = currentUser?.role === 'Supervisor';
 
   const [scanInput, setScanInput] = useState('');
   const [showScanner, setShowScanner] = useState(false);
@@ -108,15 +111,15 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: cur
       // activeTab can be 'Operator', 'QC', 'Shipping', 'Supervisor'
       // Map activeTab to operator steps: Operator = Saw/Thread/CNC, QC = QC, Shipping = Ship
       const operatorSteps = ['Saw', 'Thread', 'CNC'];
-      const isStationMatch = 
+      const isStationMatch =
         (activeTab === 'Operator' && operatorSteps.includes(item.currentStep)) ||
         (activeTab === 'QC' && item.currentStep === 'QC') ||
         (activeTab === 'Shipping' && item.currentStep === 'Ship') ||
         (activeTab === 'Supervisor'); // Supervisor can see all
 
-      setLastScanResult({ 
-        found: true, 
-        item, 
+      setLastScanResult({
+        found: true,
+        item,
         barcode: trimmedBarcode,
         stationMismatch: !isStationMatch
       });
@@ -125,17 +128,26 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: cur
       setScanInput('');  // Clear input for next scan
       focusScannerInput();  // Keep focus on scanner
     } else {
+      // Item not found - show NEW ITEM DETECTED, let user decide to add or not
       setLastScanResult({ found: false, barcode: trimmedBarcode });
-      setShowScanPopup(true);  // Show popup for not found
+      setShowScanPopup(true);  // Show popup for new item
       setScanInput('');
     }
   }, [getItemById, onItemScanned, focusScannerInput, activeTab]);
 
-  const handleMockScan = useCallback(() => {
+  // Simulate scanning an existing item (for tracking)
+  const handleMockScanExisting = useCallback(() => {
     if (allItems.length === 0) return;
     const random = allItems[Math.floor(Math.random() * allItems.length)];
     handleScan(random.id);
   }, [allItems, handleScan]);
+
+  // Simulate scanning a new item (for intake)
+  const handleMockScanNew = useCallback(() => {
+    // Generate a random new barcode that doesn't exist
+    const randomId = `NEW-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    handleScan(randomId);
+  }, [handleScan]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -178,18 +190,27 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: cur
           {lastScanResult && (
             <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-sm ${
               lastScanResult.found
-                ? 'bg-green-900/30 border border-green-700 text-green-400'
-                : 'bg-red-900/30 border border-red-700 text-red-400'
+                ? (lastScanResult.stationMismatch
+                  ? 'bg-amber-900/30 border border-amber-700 text-amber-400'
+                  : 'bg-green-900/30 border border-green-700 text-green-400')
+                : 'bg-blue-900/30 border border-blue-700 text-blue-400'
             }`}>
               {lastScanResult.found ? (
-                <>
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span>{lastScanResult.item?.name}</span>
-                </>
+                lastScanResult.stationMismatch ? (
+                  <>
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>Mismatch: {lastScanResult.item?.currentStep}</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span>{lastScanResult.item?.name}</span>
+                  </>
+                )
               ) : (
                 <>
-                  <AlertCircle className="w-4 h-4" />
-                  <span>Not found</span>
+                  <Plus className="w-4 h-4" />
+                  <span>New Item</span>
                 </>
               )}
             </div>
@@ -271,18 +292,32 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: cur
                   spellCheck={false}
                 />
               </div>
-              <button
-                onClick={() => {
-                  handleMockScan();
-                  focusScannerInput();
-                }}
-                className="px-4 bg-blue-900/30 border-2 border-blue-600 rounded-xl text-blue-300 hover:bg-blue-900/50 hover:border-blue-500 transition-colors min-h-[64px] min-w-[180px] flex items-center justify-center gap-2 font-medium active:scale-95"
-                type="button"
-                title="Test scan with random item"
-              >
-                <Dice6 className="w-5 h-5" />
-                Simulate Scan
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    handleMockScanExisting();
+                    focusScannerInput();
+                  }}
+                  className="px-4 py-2 bg-green-900/30 border-2 border-green-600 rounded-xl text-green-300 hover:bg-green-900/50 hover:border-green-500 transition-colors min-h-[30px] min-w-[180px] flex items-center justify-center gap-2 font-medium active:scale-95 text-sm"
+                  type="button"
+                  title="Test scan with random existing item"
+                >
+                  <Dice6 className="w-4 h-4" />
+                  Scan Existing Item
+                </button>
+                <button
+                  onClick={() => {
+                    handleMockScanNew();
+                    focusScannerInput();
+                  }}
+                  className="px-4 py-2 bg-blue-900/30 border-2 border-blue-600 rounded-xl text-blue-300 hover:bg-blue-900/50 hover:border-blue-500 transition-colors min-h-[30px] min-w-[180px] flex items-center justify-center gap-2 font-medium active:scale-95 text-sm"
+                  type="button"
+                  title="Test scan with new item barcode"
+                >
+                  <Plus className="w-4 h-4" />
+                  Scan New Item
+                </button>
+              </div>
             </div>
 
             {/* Suggestions */}
@@ -330,13 +365,15 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: cur
       {showScanner && showScanPopup && lastScanResult && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 pointer-events-none">
           <div className="bg-gray-800 rounded-xl p-8 w-full max-w-md border-2 pointer-events-auto" 
-            style={{ 
-              borderColor: lastScanResult.found ? (lastScanResult.stationMismatch ? '#f59e0b' : '#10b981') : '#ef4444',
-              boxShadow: lastScanResult.found 
-                ? (lastScanResult.stationMismatch 
+            style={{
+              borderColor: lastScanResult.found
+                ? (lastScanResult.stationMismatch ? '#f59e0b' : '#10b981')
+                : '#3b82f6', // Blue for new item
+              boxShadow: lastScanResult.found
+                ? (lastScanResult.stationMismatch
                   ? '0 0 30px rgba(245, 158, 11, 0.3)'
                   : '0 0 30px rgba(16, 185, 129, 0.3)')
-                : '0 0 30px rgba(239, 68, 68, 0.3)'
+                : '0 0 30px rgba(59, 130, 246, 0.3)' // Blue glow for new item
             }}>
             
             {lastScanResult.found ? (
@@ -441,7 +478,7 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: cur
 
                 {/* Action Button - Conditional */}
                 {lastScanResult.stationMismatch ? (
-                  // Switch Button for Mismatch
+                  // Switch Button for Mismatch - Yellow/Amber theme
                   <div className="space-y-2">
                     <button
                       onClick={() => {
@@ -454,14 +491,19 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: cur
                           'Ship': 'Shipping'
                         };
                         const targetTab = stepToTab[lastScanResult.item?.currentStep || ''] || activeTab;
+                        // Navigate to correct station and select the item
                         onTabChange?.(targetTab);
+                        if (lastScanResult.item) {
+                          onItemScanned?.(lastScanResult.item);
+                        }
                         setShowScanPopup(false);
-                        focusScannerInput();
+                        setShowScanner(false);
+                        setScanInput('');
                       }}
                       className="w-full px-4 py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
                     >
                       <ArrowRight className="w-5 h-5" />
-                      Switch to {lastScanResult.item?.currentStep} Station
+                      Go to {lastScanResult.item?.currentStep} Station
                     </button>
                     <button
                       onClick={() => {
@@ -474,25 +516,42 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: cur
                     </button>
                   </div>
                 ) : (
-                  // Go to Item Button for Match
-                  <button
-                    onClick={() => {
-                      setShowScanPopup(false);
-                      focusScannerInput();
-                    }}
-                    className="w-full px-4 py-3 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                    Continue Scanning
-                  </button>
+                  // View Item Details Button for Match - Green theme
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => {
+                        // Close scanner and show item details
+                        if (lastScanResult.item) {
+                          onItemScanned?.(lastScanResult.item);
+                        }
+                        setShowScanPopup(false);
+                        setShowScanner(false);
+                        setScanInput('');
+                      }}
+                      className="w-full px-4 py-3 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle2 className="w-5 h-5" />
+                      View Item Details
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowScanPopup(false);
+                        focusScannerInput();
+                      }}
+                      className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold rounded-lg transition-colors"
+                    >
+                      Continue Scanning
+                    </button>
+                  </div>
                 )}
               </>
             ) : (
+              /* NEW ITEM DETECTED - Blue theme - Let user decide to add or cancel */
               <>
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
-                    <AlertCircle className="w-6 h-6 text-red-400" />
-                    <h3 className="text-xl font-bold text-red-400">NOT FOUND</h3>
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
+                    <h3 className="text-xl font-bold text-blue-400">+ NEW ITEM DETECTED</h3>
                   </div>
                   <button
                     onClick={() => {
@@ -506,20 +565,79 @@ export function Header({ activeTab, onItemScanned, onTabChange, currentUser: cur
                 </div>
 
                 <div className="bg-gray-900 rounded-lg p-6 mb-6">
-                  <p className="text-sm text-gray-400">Barcode not found in system:</p>
-                  <p className="font-mono text-lg text-gray-300 font-bold mt-3">{lastScanResult.barcode}</p>
-                  <p className="text-xs text-gray-500 mt-3">Please verify the barcode and try again.</p>
+                  <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-4 mb-4">
+                    <div className="flex items-start gap-3">
+                      <Plus className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-blue-300 font-semibold text-sm">This barcode is not in the system.</p>
+                        <p className="text-blue-200 text-xs mt-1">You can add it as a new item to the Saw station.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Scanned Barcode</p>
+                    <p className="font-mono text-xl text-blue-400 font-bold mt-2">{lastScanResult.barcode}</p>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-gray-700">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Will be added as</p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="px-3 py-1 bg-blue-900/50 text-blue-400 rounded text-sm font-medium">Saw Station</span>
+                      <span className="text-gray-500">•</span>
+                      <span className="px-3 py-1 bg-yellow-900/50 text-yellow-400 rounded text-sm font-medium">Pending</span>
+                    </div>
+                  </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setShowScanPopup(false);
-                    focusScannerInput();
-                  }}
-                  className="w-full px-4 py-3 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg transition-colors"
-                >
-                  Try Again
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      if (isReadOnly) return;
+                      // Add new item to workflow
+                      const newItem = addNewItem(
+                        lastScanResult.barcode,
+                        currentUser?.id || 'SYSTEM',
+                        currentUser?.name || 'System'
+                      );
+                      if (newItem) {
+                        // Navigate to Operator tab (Saw station) and select the new item
+                        onTabChange?.('Operator');
+                        onItemScanned?.(newItem);
+                        setShowScanPopup(false);
+                        setShowScanner(false);
+                        setScanInput('');
+                      }
+                    }}
+                    disabled={isReadOnly}
+                    className={`w-full px-4 py-3 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                      isReadOnly
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-500 text-white'
+                    }`}
+                    title={isReadOnly ? 'Supervisors cannot add items (Read-Only Mode)' : 'Add this item to the workflow'}
+                  >
+                    <Plus className="w-5 h-5" />
+                    Add to Workflow (Saw)
+                    {isReadOnly && <Eye className="w-4 h-4 ml-2" />}
+                  </button>
+
+                  {isReadOnly && (
+                    <p className="text-xs text-center text-amber-400">
+                      Read-Only Mode: Supervisors cannot add new items
+                    </p>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setShowScanPopup(false);
+                      focusScannerInput();
+                    }}
+                    className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </>
             )}
           </div>

@@ -39,6 +39,9 @@ interface WorkflowContextType {
   // QC specific
   passQC: (itemId: string, operatorId: string, operatorName: string) => boolean;
   failQC: (itemId: string, reason: HoldReason, operatorId: string, operatorName: string) => boolean;
+
+  // Intake - add new item to workflow
+  addNewItem: (itemId: string, operatorId: string, operatorName: string) => WorkItem | null;
 }
 
 const WorkflowContext = createContext<WorkflowContextType | null>(null);
@@ -350,6 +353,60 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     return true;
   }, [getItemById, updateItem]);
 
+  // Add new item to workflow (intake at Saw station)
+  const addNewItem = useCallback((
+    itemId: string,
+    operatorId: string,
+    operatorName: string
+  ): WorkItem | null => {
+    // Check if item already exists
+    const existingItem = getItemById(itemId);
+    if (existingItem) return null;
+
+    const now = new Date();
+    const newItem: WorkItem = {
+      id: itemId,
+      orderId: 'INTAKE',
+      name: `Intake Item ${itemId}`,
+      description: 'Item added via barcode intake',
+      quantity: 1,
+      currentStep: 'Saw',
+      status: 'Pending',
+      onHold: false,
+      priority: 'Normal',
+      auditHistory: [
+        createAuditEntry('Saw', 'Created', operatorId, operatorName, 'Item added to workflow via scanner intake'),
+      ],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Add to the first order or create intake order
+    setOrders((prevOrders) => {
+      const intakeOrder = prevOrders.find((o) => o.id === 'INTAKE-ORDER');
+      if (intakeOrder) {
+        return prevOrders.map((order) =>
+          order.id === 'INTAKE-ORDER'
+            ? { ...order, items: [...order.items, newItem] }
+            : order
+        );
+      } else {
+        // Create new intake order
+        const newOrder: Order = {
+          id: 'INTAKE-ORDER',
+          customerName: 'Intake Items',
+          orderNumber: 'INTAKE-001',
+          items: [newItem],
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+          createdAt: now,
+        };
+        return [...prevOrders, newOrder];
+      }
+    });
+
+    return newItem;
+  }, [getItemById]);
+
   return (
     <WorkflowContext.Provider
       value={{
@@ -369,6 +426,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
         canShipItem,
         passQC,
         failQC,
+        addNewItem,
       }}
     >
       {children}
