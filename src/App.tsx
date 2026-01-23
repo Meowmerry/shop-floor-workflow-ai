@@ -21,6 +21,9 @@ function App() {
   const [scannedItem, setScannedItem] = useState<any>(null);
   const [currentStep, setCurrentStep] = useState<string | undefined>(undefined);
 
+  // Track the user ID to detect when a different user logs in
+  const [prevUserId, setPrevUserId] = useState(currentUser?.badgeId);
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
@@ -28,10 +31,11 @@ function App() {
     }
   }, [isAuthenticated, navigate]);
 
-  // Sync active tab when user role changes (e.g., after login)
-  const userRole = currentUser?.role as NavTab | undefined;
-  if (userRole && userRole !== activeTab) {
-    setActiveTab(userRole);
+  // Sync active tab only when a different user logs in (not when Supervisor switches tabs)
+  // This pattern is called "adjusting state during render" - React recommended approach
+  if (currentUser?.badgeId !== prevUserId) {
+    setPrevUserId(currentUser?.badgeId);
+    setActiveTab((currentUser?.role as NavTab) ?? 'Operator');
   }
 
   if (!isAuthenticated || !currentUser) {

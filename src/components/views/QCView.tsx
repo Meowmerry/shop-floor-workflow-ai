@@ -270,24 +270,32 @@ export function QCView({ scannedItem, onClearScan }: QCViewProps) {
               {/* Checklist */}
               {!currentItem.onHold && currentItem.status === 'In Progress' && (
                 <div className="bg-gray-900 rounded-lg p-4">
-                  <h5 className="text-sm font-medium text-gray-300 mb-3">QC Checklist</h5>
+                  <h5 className="text-sm font-medium text-gray-300 mb-3">
+                    QC Checklist
+                    {isSupervisor && <span className="text-gray-500 text-xs ml-2">(View Only)</span>}
+                  </h5>
                   <div className="space-y-2">
                     {Object.keys(checklist).map((check) => (
                       <label
                         key={check}
-                        className="flex items-center gap-3 p-2 rounded hover:bg-gray-800 cursor-pointer min-h-[44px]"
+                        className={`flex items-center gap-3 p-2 rounded min-h-[44px] ${
+                          isSupervisor
+                            ? 'cursor-not-allowed opacity-60'
+                            : 'hover:bg-gray-800 cursor-pointer'
+                        }`}
                       >
                         <input
                           type="checkbox"
                           checked={checklist[check]}
-                          onChange={() => toggleChecklistItem(check)}
-                          className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-green-500 focus:ring-green-500"
+                          onChange={() => !isSupervisor && toggleChecklistItem(check)}
+                          disabled={isSupervisor}
+                          className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-green-500 focus:ring-green-500 disabled:cursor-not-allowed"
                         />
                         <span className={checklist[check] ? 'text-green-400' : 'text-gray-300'}>{check}</span>
                       </label>
                     ))}
                   </div>
-                  {!allChecked && (
+                  {!isSupervisor && !allChecked && (
                     <p className="text-yellow-400 text-xs mt-3">Complete all checks to pass inspection</p>
                   )}
                 </div>
